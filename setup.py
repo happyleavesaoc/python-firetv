@@ -4,6 +4,7 @@ setup(
     name='firetv',
     version='1.0.0',
     description='Communicate with an Amazon Fire TV device via ADB over a network.',
+    url='https://github.com/happyleavesaoc/python-firetv/',
     license='MIT',
     packages=['firetv'],
     install_requires=['adb>=1.1.1'],

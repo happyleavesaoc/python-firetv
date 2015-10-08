@@ -74,7 +74,6 @@ def add_device():
             "device_id": "<your_device_id>",
             "host": "<address>:<port>"
         }
-
     
     """
     req = request.get_json()
@@ -97,22 +96,26 @@ def list_devices():
 @app.route('/devices/<device_id>/state', methods=['GET'])
 def device_state(device_id):
     """ Get device state via HTTP GET. """
+    if device_id not in devices:
+        return jsonfiy(success=False)
     return jsonify(state=devices[device_id].state)
 
 @app.route('/devices/<device_id>/action/<action_id>', methods=['GET'])
 def device_action(device_id, action_id):
     """ Initiate device action via HTTP GET. """
     success = False
-    input_cmd = getattr(devices[device_id], action_id, None)
-    if callable(input_cmd):
-        input_cmd()
-        success = True  
+    if device_id in devices:
+        input_cmd = getattr(devices[device_id], action_id, None)
+        if callable(input_cmd):
+            input_cmd()
+            success = True  
     return jsonify(success=success)
 
 @app.route('/devices/<device_id>/connect', methods=['GET'])
 def device_connect():
     """ Force a connection attempt via HTTP GET. """
-    devices[device_id].connect()
+    if device_id in devices:
+        devices[device_id].connect()
 
 def main():
     """ Set up the server. """
