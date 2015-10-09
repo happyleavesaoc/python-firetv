@@ -10,7 +10,7 @@ import errno
 from socket import error as socket_error
 from adb import adb_commands
 
-""" ADB key event codes. """
+# ADB key event codes.
 HOME = 3
 VOLUME_UP = 24
 VOLUME_DOWN = 25
@@ -21,7 +21,7 @@ PREVIOUS = 88
 PLAY = 126
 PAUSE = 127
 
-""" Fire TV states. """
+# Fire TV states.
 STATE_ON = 'on'
 STATE_IDLE = 'idle'
 STATE_OFF = 'off'
@@ -30,7 +30,10 @@ STATE_PAUSED = 'pause'
 STATE_STANDBY = 'standby'
 STATE_DISCONNECTED = 'disconnected'
 
+
 class FireTV:
+    """ Represents an Amazon Fire TV device. """
+
     def __init__(self, host):
         """ Initialize FireTV object.
 
@@ -147,7 +150,8 @@ class FireTV:
 
         :param cmd: Input command.
         """
-        if not self._adb: return
+        if not self._adb:
+            return
         self._adb.Shell('input {0}'.format(cmd))
 
     def _key(self, key):
@@ -164,7 +168,8 @@ class FireTV:
         :param grep: Grep for this string.
         :returns: Dump, optionally grepped.
         """
-        if not self._adb: return
+        if not self._adb:
+            return
         if grep:
             return self._adb.Shell('dumpsys {0} | grep {1}'.format(service, grep))
         return self._adb.Shell('dumpsys {0}'.format(service))

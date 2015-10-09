@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" 
+"""
 Amazon Fire TV server
 
 RESTful interface for communication over a network via ADB
@@ -74,7 +74,7 @@ def add_device():
             "device_id": "<your_device_id>",
             "host": "<address>:<port>"
         }
-    
+
     """
     req = request.get_json()
     success = False
@@ -97,7 +97,7 @@ def list_devices():
 def device_state(device_id):
     """ Get device state via HTTP GET. """
     if device_id not in devices:
-        return jsonfiy(success=False)
+        return jsonify(success=False)
     return jsonify(state=devices[device_id].state)
 
 @app.route('/devices/<device_id>/action/<action_id>', methods=['GET'])
@@ -108,11 +108,11 @@ def device_action(device_id, action_id):
         input_cmd = getattr(devices[device_id], action_id, None)
         if callable(input_cmd):
             input_cmd()
-            success = True  
+            success = True
     return jsonify(success=success)
 
 @app.route('/devices/<device_id>/connect', methods=['GET'])
-def device_connect():
+def device_connect(device_id):
     """ Force a connection attempt via HTTP GET. """
     if device_id in devices:
         devices[device_id].connect()
