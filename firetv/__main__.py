@@ -27,6 +27,7 @@ app = Flask(__name__)
 devices = {}
 valid_device_id = re.compile('^[-\w]+$')
 
+
 def is_valid_host(host):
     """ Check if host is valid.
 
@@ -40,6 +41,7 @@ def is_valid_host(host):
     parts = host.split(':')
     return not (len(parts) != 2 or not parts[1].isdigit())
 
+
 def is_valid_device_id(device_id):
     """ Check if device identifier is valid.
 
@@ -49,6 +51,7 @@ def is_valid_device_id(device_id):
     :returns: Valid or not.
     """
     return valid_device_id.match(device_id)
+
 
 def add(device_id, host):
     """ Add a device.
@@ -61,8 +64,9 @@ def add(device_id, host):
     """
     valid = is_valid_device_id(device_id) and is_valid_host(host)
     if valid:
-        devices[device_id] = FireTV(host)
+        devices[device_id] = FireTV(str(host))
     return valid
+
 
 @app.route('/devices/add', methods=['POST'])
 def add_device():
@@ -82,6 +86,7 @@ def add_device():
         success = add(req['device_id'], req['host'])
     return jsonify(success=success)
 
+
 @app.route('/devices/list', methods=['GET'])
 def list_devices():
     """ List devices via HTTP GET. """
@@ -93,14 +98,16 @@ def list_devices():
         }
     return jsonify(devices=output)
 
-@app.route('/devices/<device_id>/state', methods=['GET'])
+
+@app.route('/devices/state/<device_id>', methods=['GET'])
 def device_state(device_id):
     """ Get device state via HTTP GET. """
     if device_id not in devices:
         return jsonify(success=False)
     return jsonify(state=devices[device_id].state)
 
-@app.route('/devices/<device_id>/action/<action_id>', methods=['GET'])
+
+@app.route('/devices/action/<device_id>/<action_id>', methods=['GET'])
 def device_action(device_id, action_id):
     """ Initiate device action via HTTP GET. """
     success = False
@@ -111,11 +118,16 @@ def device_action(device_id, action_id):
             success = True
     return jsonify(success=success)
 
-@app.route('/devices/<device_id>/connect', methods=['GET'])
+
+@app.route('/devices/connect/<device_id>', methods=['GET'])
 def device_connect(device_id):
     """ Force a connection attempt via HTTP GET. """
+    success = False
     if device_id in devices:
         devices[device_id].connect()
+        success = True
+    return jsonify(success=success)
+
 
 def main():
     """ Set up the server. """
@@ -126,6 +138,7 @@ def main():
     if args.default and not add('default', args.default):
         exit('invalid hostname')
     app.run(host='0.0.0.0', port=args.port)
+
 
 if __name__ == '__main__':
     main()

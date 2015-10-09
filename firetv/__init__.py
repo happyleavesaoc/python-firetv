@@ -50,7 +50,8 @@ class FireTV:
         Failure sets state to DISCONNECTED and disables sending actions.
         """
         try:
-            self._adb = adb_commands.AdbCommands.ConnectDevice(serial=self.host)
+            self._adb = adb_commands.AdbCommands.ConnectDevice(
+                serial=self.host)
         except socket_error as serr:
             if serr.errno != errno.ECONNREFUSED:
                 raise serr
@@ -139,7 +140,8 @@ class FireTV:
     @property
     def _launcher(self):
         """ Check if the active application is the Amazon TV launcher. """
-        return self._dump_has('window', 'mFocusedApp=AppWindowToken', 'com.amazon.tv.launcher')
+        return self._dump_has('window', 'mFocusedApp=AppWindowToken',
+                              'com.amazon.tv.launcher')
 
     def _power(self):
         """ Send power action. """
