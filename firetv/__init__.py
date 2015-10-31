@@ -210,7 +210,6 @@ class FireTV:
             # this is to ensure that we get only one line
             for line in bad_line.splitlines():
                 if search in line:
-                    print '-'+line
                     result.append(line.strip().rsplit(' ',1)[-1])
         return result
 
