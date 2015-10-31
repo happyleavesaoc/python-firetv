@@ -33,6 +33,8 @@ All routes return JSON.
 - `GET /devices/list` (list all registered devices and state)
 - `GET /devices/connect/<device_id>` (force connection attempt)
 - `GET /devices/state/<device_id>` (return state)
+- `GET /devices/<device_id>/apps/running` (return running user apps)
+- `GET /devices/<device_id>/apps/state/<app_id>` (returns if appid is running)
 - `GET /devices/action/<device_id>/<action_id>` (request action)
 - `POST /devices/add` (see below)
 
@@ -50,7 +52,7 @@ POST JSON in the following format with the HTTP header `Content-Type: applicatio
 
 ## Features
 
-`firetv` can detect device state and issue a number of actions.
+`firetv` can detect device state and issue a number of actions. It can also get the running state of user apps.
 
 ### Detected States
 
@@ -73,6 +75,13 @@ POST JSON in the following format with the HTTP header `Content-Type: applicatio
 - `media_previous` (emulate Rewind button)
 - `volume_up` (raise volume)
 - `volume_down` (lower volume)
+
+### Apps
+
+- `GET /devices/<device_id>/apps/running`
+- `/devices/<device_id>/apps/state/<app_id>`
+
+app_id can be anything from a single word, e.g. 'netflix' or the full package name, e.g. com.netflix.ninja
 
 ## Python 3
 `firetv` depends on [python-adb](https://github.com/google/python-adb), a pure-python implementation of the ADB protocol. It and its dependency [M2Crypto](https://github.com/martinpaljak/M2Crypto) are written for Python 2. Until they support Python 3, or an alternative is available, `firetv` will not support Python 3. The HTTP server is provided as a way for Python 3 (or other) software to utilize the features of `firetv`.

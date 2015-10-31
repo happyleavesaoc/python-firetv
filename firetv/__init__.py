@@ -30,7 +30,6 @@ STATE_PAUSED = 'pause'
 STATE_STANDBY = 'standby'
 STATE_DISCONNECTED = 'disconnected'
 
-
 class FireTV:
     """ Represents an Amazon Fire TV device. """
 
@@ -79,6 +78,16 @@ class FireTV:
             return STATE_PLAYING
         # Otherwise, device is paused.
         return STATE_PAUSED
+
+    def running_apps(self):
+        """ Return an array of running user applications """
+        return self._ps('u0_a')
+
+    def app_state(self, app):
+        """ Informs if application is running """
+        if len(self._ps(app)) > 0:
+            return STATE_ON
+        return STATE_OFF
 
     def turn_on(self):
         """ Send power action if device is off. """
@@ -185,3 +194,19 @@ class FireTV:
         :returns: Found or not.
         """
         return self._dump(service, grep=grep).strip().find(search) > -1
+
+    def _ps(self, search=''):
+        """ Perform a ps command with optional filtering.
+
+        :param search: Check for this substring.
+        :returns: List of matching fields
+        """
+        if not self._adb:
+            return
+        result = []
+        ps = self._adb.StreamingShell('ps')
+        for line in ps:
+            if search in line:
+                result.append(line.strip().rsplit(' ',1)[-1])
+        return result
+
