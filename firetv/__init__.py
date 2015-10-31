@@ -205,8 +205,12 @@ class FireTV:
             return
         result = []
         ps = self._adb.StreamingShell('ps')
-        for line in ps:
-            if search in line:
-                result.append(line.strip().rsplit(' ',1)[-1])
+        for bad_line in ps:
+            # The splitting of the StreamingShell doesn't always work
+            # this is to ensure that we get only one line
+            for line in bad_line.splitlines():
+                if search in line:
+                    print '-'+line
+                    result.append(line.strip().rsplit(' ',1)[-1])
         return result
 
