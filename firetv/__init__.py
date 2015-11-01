@@ -86,6 +86,8 @@ class FireTV:
 
     def app_state(self, app):
         """ Informs if application is running """
+        if self.state != STATE_PLAYING:
+            return STATE_OFF
         if len(self._ps(app)) > 0:
             return STATE_ON
         return STATE_OFF
