@@ -20,12 +20,13 @@ Find device IP:
 
 import argparse
 import re
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, abort
 from firetv import FireTV
 
 app = Flask(__name__)
 devices = {}
 valid_device_id = re.compile('^[-\w]+$')
+valid_app_id = re.compile('^[a-zA-Z][a-z\.A-Z]+$')
 
 
 def is_valid_host(host):
@@ -52,6 +53,16 @@ def is_valid_device_id(device_id):
     """
     return valid_device_id.match(device_id)
 
+def is_valid_app_id(app_id):
+    """ check if app identifier is valid.
+
+    To restrict access a valid app is one with only a-z, A-Z, and '.'.
+    It is possible to make this less restrictive using the regex above.
+
+    :param app_id: Application identifier
+    :returns: Valid or not
+    """
+    return valid_app_id.match(app_id)
 
 def add(device_id, host):
     """ Add a device.
@@ -106,6 +117,25 @@ def device_state(device_id):
         return jsonify(success=False)
     return jsonify(state=devices[device_id].state)
 
+@app.route('/devices/<device_id>/apps/running', methods=['GET'])
+def running_apps(device_id):
+    """ Get running apps via HTTP GET. """
+    if not is_valid_device_id(device_id):
+        abort(403)
+    if device_id not in devices:
+        abort(404)
+    return jsonify(running_apps=devices[device_id].running_apps())
+
+@app.route('/devices/<device_id>/apps/state/<app_id>', methods=['GET'])
+def get_app_state(device_id, app_id):
+    """ Get the state of the requested app """
+    if not is_valid_app_id(app_id):
+        abort(403)
+    if not is_valid_device_id(device_id):
+        abort(403)
+    if device_id not in devices:
+        abort(404)
+    return jsonify(status=devices[device_id].app_state(app_id))
 
 @app.route('/devices/action/<device_id>/<action_id>', methods=['GET'])
 def device_action(device_id, action_id):

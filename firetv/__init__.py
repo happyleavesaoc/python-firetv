@@ -9,6 +9,7 @@ ADB Debugging must be enabled.
 import errno
 from socket import error as socket_error
 from adb import adb_commands
+from adb.adb_protocol import InvalidChecksumError
 
 # ADB key event codes.
 HOME = 3
@@ -29,7 +30,6 @@ STATE_PLAYING = 'play'
 STATE_PAUSED = 'pause'
 STATE_STANDBY = 'standby'
 STATE_DISCONNECTED = 'disconnected'
-
 
 class FireTV:
     """ Represents an Amazon Fire TV device. """
@@ -79,6 +79,18 @@ class FireTV:
             return STATE_PLAYING
         # Otherwise, device is paused.
         return STATE_PAUSED
+
+    def running_apps(self):
+        """ Return an array of running user applications """
+        return self._ps('u0_a')
+
+    def app_state(self, app):
+        """ Informs if application is running """
+        if self.state != STATE_PLAYING:
+            return STATE_OFF
+        if len(self._ps(app)) > 0:
+            return STATE_ON
+        return STATE_OFF
 
     def turn_on(self):
         """ Send power action if device is off. """
@@ -185,3 +197,26 @@ class FireTV:
         :returns: Found or not.
         """
         return self._dump(service, grep=grep).strip().find(search) > -1
+
+    def _ps(self, search=''):
+        """ Perform a ps command with optional filtering.
+
+        :param search: Check for this substring.
+        :returns: List of matching fields
+        """
+        if not self._adb:
+            return
+        result = []
+        ps = self._adb.StreamingShell('ps')
+        try:
+            for bad_line in ps:
+                # The splitting of the StreamingShell doesn't always work
+                # this is to ensure that we get only one line
+                for line in bad_line.splitlines():
+                    if search in line:
+                        result.append(line.strip().rsplit(' ',1)[-1])
+            return result
+        except InvalidChecksumError as e:
+            print e
+            self.connect()
+            raise IOError
