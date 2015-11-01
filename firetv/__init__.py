@@ -9,6 +9,7 @@ ADB Debugging must be enabled.
 import errno
 from socket import error as socket_error
 from adb import adb_commands
+from adb.adb_protocol import InvalidChecksumError
 
 # ADB key event codes.
 HOME = 3
@@ -205,11 +206,15 @@ class FireTV:
             return
         result = []
         ps = self._adb.StreamingShell('ps')
-        for bad_line in ps:
-            # The splitting of the StreamingShell doesn't always work
-            # this is to ensure that we get only one line
-            for line in bad_line.splitlines():
-                if search in line:
-                    result.append(line.strip().rsplit(' ',1)[-1])
-        return result
-
+        try:
+            for bad_line in ps:
+                # The splitting of the StreamingShell doesn't always work
+                # this is to ensure that we get only one line
+                for line in bad_line.splitlines():
+                    if search in line:
+                        result.append(line.strip().rsplit(' ',1)[-1])
+            return result
+        except InvalidChecksumError as e:
+            print e
+            self.connect()
+            raise IOError
