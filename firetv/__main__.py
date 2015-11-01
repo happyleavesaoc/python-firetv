@@ -26,7 +26,7 @@ from firetv import FireTV
 app = Flask(__name__)
 devices = {}
 valid_device_id = re.compile('^[-\w]+$')
-valid_app_id = re.compile('^[a-z][a-z\.]+$')
+valid_app_id = re.compile('^[a-zA-Z][a-z\.A-Z]+$')
 
 
 def is_valid_host(host):
@@ -56,7 +56,7 @@ def is_valid_device_id(device_id):
 def is_valid_app_id(app_id):
     """ check if app identifier is valid.
 
-    To restrict access a valid app is one with only a-z and '.'.
+    To restrict access a valid app is one with only a-z, A-Z, and '.'.
     It is possible to make this less restrictive using the regex above.
 
     :param app_id: Application identifier
