@@ -4,6 +4,10 @@
 
 ## Installation
 
+Install the following ADB dependencies via your package manager:
+
+`swig libssl-dev python-dev libusb-1.0-0`
+
 Be sure you install into a Python 2.x environment.
 
 `pip install firetv`
