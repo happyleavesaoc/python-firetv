@@ -21,6 +21,13 @@ NEXT = 87
 PREVIOUS = 88
 PLAY = 126
 PAUSE = 127
+UP = 19
+DOWN = 20
+LEFT = 21
+RIGHT = 22
+ENTER = 66
+BACK = 4
+MENU = 1
 
 # Fire TV states.
 STATE_ON = 'on'
@@ -105,6 +112,34 @@ class FireTV:
     def home(self):
         """ Send home action. """
         self._key(HOME)
+
+    def up(self):
+        """ Send up action. """
+        self._key(UP)
+
+    def down(self):
+        """ Send down action. """
+        self._key(DOWN)
+
+    def left(self):
+        """ Send left action. """
+        self._key(LEFT)
+
+    def right(self):
+        """ Send right action. """
+        self._key(RIGHT)
+
+    def enter(self):
+        """ Send enter action. """
+        self._key(ENTER)
+
+    def back(self):
+        """ Send back action. """
+        self._key(BACK)
+
+    def menu(self):
+        """ Send menu action. """
+        self._key(MENU)
 
     def volume_up(self):
         """ Send volume up action. """
