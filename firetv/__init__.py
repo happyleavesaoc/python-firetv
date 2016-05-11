@@ -172,7 +172,7 @@ class FireTV:
     @property
     def _screen_on(self):
         """ Check if the screen is on. """
-        return self._dump_has('power', 'mScreenOn', 'true')
+        return self._dump_has('power', 'Display Power', 'state=ON')
 
     @property
     def _awake(self):
@@ -220,7 +220,7 @@ class FireTV:
         if not self._adb:
             return
         if grep:
-            return self._adb.Shell('dumpsys {0} | grep {1}'.format(service, grep))
+            return self._adb.Shell('dumpsys {0} | grep "{1}"'.format(service, grep))
         return self._adb.Shell('dumpsys {0}'.format(service))
 
     def _dump_has(self, service, grep, search):
