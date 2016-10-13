@@ -40,6 +40,8 @@ All routes return JSON.
 - `GET /devices/<device_id>/apps/running` (return running user apps)
 - `GET /devices/<device_id>/apps/state/<app_id>` (returns if appid is running)
 - `GET /devices/action/<device_id>/<action_id>` (request action)
+- `GET /devices/<device_id>/apps/<app_id>/start` (start an app)
+- `GET /devices/<device_id>/apps/<app_id>/stop` (stop an app)
 - `POST /devices/add` (see below)
 
 #### Add A Device
@@ -86,6 +88,13 @@ POST JSON in the following format with the HTTP header `Content-Type: applicatio
 - `/devices/<device_id>/apps/state/<app_id>`
 
 app_id can be anything from a single word, e.g. 'netflix' or the full package name, e.g. com.netflix.ninja
+
+You Can start or stop an app with the following commands:
+
+- `GET /devices/<device_id>/apps/<app_id>/start` 
+- `GET /devices/<device_id>/apps/<app_id>/stop` 
+
+app_id must be a package name, e.g. org.xbmc.kodi
 
 ## Python 3
 `firetv` depends on [python-adb](https://github.com/google/python-adb), a pure-python implementation of the ADB protocol. It and its dependency [M2Crypto](https://github.com/martinpaljak/M2Crypto) are written for Python 2. Until they support Python 3, or an alternative is available, `firetv` will not support Python 3. The HTTP server is provided as a way for Python 3 (or other) software to utilize the features of `firetv`.
