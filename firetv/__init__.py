@@ -82,7 +82,7 @@ class FireTV:
         if self._launcher:
             return STATE_STANDBY
         # Check for a wake lock (device is playing).
-        if self._wake_lock:
+        if self._audio_playing:
             return STATE_PLAYING
         # Otherwise, device is paused.
         return STATE_PAUSED
@@ -190,9 +190,12 @@ class FireTV:
         return self._dump_has('power', 'mWakefulness', 'Awake')
 
     @property
-    def _wake_lock(self):
-        """ Check for wake locks (device is playing). """
-        return not self._dump_has('power', 'Locks', 'size=0')
+    def _audio_playing(self):
+        """ Check for audio playing (device is playing). """
+        if not self._adb:
+            return
+        self._adb.Shell('cat /proc/asound/card*/pcm*/sub*/status | grep "state"')
+        # TODO: last line should contain "RUNNING"
 
     @property
     def _launcher(self):
