@@ -169,6 +169,16 @@ class FireTV:
         """ Send media previous action (results in rewind). """
         self._key(PREVIOUS)
 
+    def launch_app(self, app):
+        if not self._adb:
+            return
+        self._adb.Shell('am start -n {0}'.format(app))
+
+    def stop_app(self, app):
+        if not self._adb:
+            return
+        self._adb.Shell('am force-stop {0}'.format(app))
+
     @property
     def _screen_on(self):
         """ Check if the screen is on. """
@@ -189,6 +199,8 @@ class FireTV:
         """ Check if the active application is the Amazon TV launcher. """
         return self._dump_has('window', 'mFocusedApp=AppWindowToken',
                               'com.amazon.tv.launcher')
+
+
 
     def _power(self):
         """ Send power action. """
