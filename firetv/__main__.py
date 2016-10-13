@@ -150,6 +150,7 @@ def device_action(device_id, action_id):
 
 @app.route('/devices/<device_id>/apps/<app_id>/start' , methods=['GET'])
 def app_start(device_id, app_id):
+    """ Starts an app with corresponding package name"""
     if not is_valid_app_id(app_id):
         abort(403)
     if not is_valid_device_id(device_id):
@@ -161,6 +162,7 @@ def app_start(device_id, app_id):
 
 @app.route('/devices/<device_id>/apps/<app_id>/stop' , methods=['GET'])
 def app_stop(device_id, app_id):
+    """ stops an app with corresponding package name"""
     if not is_valid_app_id(app_id):
         abort(403)
     if not is_valid_device_id(device_id):
@@ -170,7 +172,6 @@ def app_stop(device_id, app_id):
     devices[device_id].stop_app(app_id)
     return jsonify(success=True)
 
-
 @app.route('/devices/connect/<device_id>', methods=['GET'])
 def device_connect(device_id):
     """ Force a connection attempt via HTTP GET. """
@@ -179,7 +180,6 @@ def device_connect(device_id):
         devices[device_id].connect()
         success = True
     return jsonify(success=success)
-
 
 def main():
     """ Set up the server. """
