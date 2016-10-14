@@ -89,7 +89,7 @@ POST JSON in the following format with the HTTP header `Content-Type: applicatio
 
 app_id can be anything from a single word, e.g. 'netflix' or the full package name, e.g. com.netflix.ninja
 
-You Can start or stop an app with the following commands:
+You can start or stop an app with the following commands:
 
 - `GET /devices/<device_id>/apps/<app_id>/start` 
 - `GET /devices/<device_id>/apps/<app_id>/stop` 
