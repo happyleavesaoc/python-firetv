@@ -194,8 +194,7 @@ class FireTV:
         """ Check for audio playing (device is playing). """
         if not self._adb:
             return
-        self._adb.Shell('cat /proc/asound/card*/pcm*/sub*/status | grep "state"')
-        # TODO: last line should contain "RUNNING"
+        return self._adb.Shell('cat /proc/asound/card*/pcm*/sub*/status | grep "state"').find('RUNNING') > -1
 
     @property
     def _launcher(self):
