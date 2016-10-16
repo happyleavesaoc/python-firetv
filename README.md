@@ -94,7 +94,7 @@ You can start or stop an app with the following commands:
 - `GET /devices/<device_id>/apps/<app_id>/start` 
 - `GET /devices/<device_id>/apps/<app_id>/stop` 
 
-app_id must be a package name, e.g. org.xbmc.kodi
+app_id must be a package name, e.g. org.xbmc.kodi or com.netflix.ninja
 
 ## Python 3
 `firetv` depends on [python-adb](https://github.com/google/python-adb), a pure-python implementation of the ADB protocol. It and its dependency [M2Crypto](https://github.com/martinpaljak/M2Crypto) are written for Python 2. Until they support Python 3, or an alternative is available, `firetv` will not support Python 3. The HTTP server is provided as a way for Python 3 (or other) software to utilize the features of `firetv`.
