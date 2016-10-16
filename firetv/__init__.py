@@ -172,7 +172,12 @@ class FireTV:
     def launch_app(self, app):
         if not self._adb:
             return
-        self._adb.Shell('am start -n {0}'.format(app))
+        mainActivity = self._mainActivity(app)
+        if mainActivity:
+            self._adb.Shell('am start -n {0}'.format(mainActivity))
+            return True
+        else:
+            return False
 
     def stop_app(self, app):
         if not self._adb:
@@ -267,3 +272,6 @@ class FireTV:
             print e
             self.connect()
             raise IOError
+
+    def _mainActivity(self, app):
+        return self._adb.Shell(('pm dump {0} | grep -A 1 "MAIN" | grep {0}').format(app)).strip().split(" ")[1]
