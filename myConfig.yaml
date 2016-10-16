@@ -1,6 +1,0 @@
-devices:
-  sleeping_room:
-    host: 192.168.178.43:5555
-  living_room:
-    host: 192.168.178.45:5555
-
