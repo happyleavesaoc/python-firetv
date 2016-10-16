@@ -20,11 +20,14 @@ Find device IP:
 
 import argparse
 import re
+import yaml
 from flask import Flask, jsonify, request, abort
 from firetv import FireTV
 
+
 app = Flask(__name__)
 devices = {}
+config_data = None
 valid_device_id = re.compile('^[-\w]+$')
 valid_app_id = re.compile('^[a-zA-Z][a-z\.A-Z]+$')
 
@@ -181,12 +184,36 @@ def device_connect(device_id):
         success = True
     return jsonify(success=success)
 
+
+def _parse_config(config_file_path):
+    """ Parse Config File from yaml file. """
+    config_file = open(config_file_path, 'r')
+    config = yaml.load(config_file)
+    config_file.close()
+    return config
+
+def _add_devices_from_config(args):
+    """ Add devices from config. """
+    config = _parse_config(args.config)
+    for device in config['devices']:
+        if args.default:
+            if device == "default":
+                raise ValueError('devicename "default" in config is not allowed if default param is set')
+            if config['devices'][device]['host'] == args.default:
+                raise ValueError('host set in default param must not be defined in config')
+        add(device, config['devices'][device]['host'])
+
 def main():
     """ Set up the server. """
     parser = argparse.ArgumentParser(description='AFTV Server')
     parser.add_argument('-p', '--port', type=int, help='listen port', default=5556)
     parser.add_argument('-d', '--default', help='default Amazon Fire TV host', nargs='?')
+    parser.add_argument('-c', '--config', type=str, help='Path to config file')
     args = parser.parse_args()
+
+    if args.config:
+        _add_devices_from_config(args)
+
     if args.default and not add('default', args.default):
         exit('invalid hostname')
     app.run(host='0.0.0.0', port=args.port)
