@@ -162,7 +162,8 @@ def app_start(device_id, app_id):
         abort(403)
     if device_id not in devices:
         abort(404)
-    devices[device_id].launch_app(app_id + "/.Splash")
+    if not devices[device_id].launch_app(app_id):
+        abort(404)
     return jsonify(success=True)
 
 @app.route('/devices/<device_id>/apps/<app_id>/stop' , methods=['GET'])

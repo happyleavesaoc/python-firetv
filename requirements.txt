@@ -1,4 +1,7 @@
-adb==1.1.1
+# need to install git version as this issue
+# https://github.com/google/python-adb/pull/5
+# is not fixed in pip version
+git+https://github.com/google/python-adb.git
 Flask==0.10.1
 itsdangerous==0.24
 Jinja2==2.8
