@@ -137,6 +137,10 @@ def get_app_state(device_id, app_id):
         abort(404)
     return jsonify(status=devices[device_id].app_state(app_id))
 
+@app.route('/devices/<device_id>/apps/<appid>/state', methods=['GET'])
+def get_app_state_alt(device_id, app_id):
+    return get_app_state(device_id, app_id)
+
 @app.route('/devices/action/<device_id>/<action_id>', methods=['GET'])
 def device_action(device_id, action_id):
     """ Initiate device action via HTTP GET. """

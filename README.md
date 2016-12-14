@@ -37,11 +37,12 @@ All routes return JSON.
 - `GET /devices/list` (list all registered devices and state)
 - `GET /devices/connect/<device_id>` (force connection attempt)
 - `GET /devices/state/<device_id>` (return state)
-- `GET /devices/<device_id>/apps/running` (return running user apps)
-- `GET /devices/<device_id>/apps/state/<app_id>` (returns if appid is running)
 - `GET /devices/action/<device_id>/<action_id>` (request action)
+- `GET /devices/<device_id>/apps/running` (return running user apps)
 - `GET /devices/<device_id>/apps/<app_id>/start` (start an app)
 - `GET /devices/<device_id>/apps/<app_id>/stop` (stop an app)
+- `GET /devices/<device_id>/apps/<app_id>/state` (check app state)
+- `GET /devices/<device_id>/apps/state/<app_id>` (check app state, deprecated format)
 - `POST /devices/add` (see below)
 
 #### Add A Device
@@ -86,6 +87,7 @@ POST JSON in the following format with the HTTP header `Content-Type: applicatio
 
 - `GET /devices/<device_id>/apps/running`
 - `/devices/<device_id>/apps/state/<app_id>`
+- `/devices/<device_id>/apps/<app_id>/state`
 
 app_id can be anything from a single word, e.g. 'netflix' or the full package name, e.g. com.netflix.ninja
 
