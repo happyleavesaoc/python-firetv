@@ -135,7 +135,8 @@ def get_app_state(device_id, app_id):
         abort(403)
     if device_id not in devices:
         abort(404)
-    return jsonify(status=devices[device_id].app_state(app_id))
+    app_state = devices[device_id].app_state(app_id)
+    return jsonify(state=app_state, status=app_state)
 
 @app.route('/devices/<device_id>/apps/<app_id>/state', methods=['GET'])
 def get_app_state_alt(device_id, app_id):
