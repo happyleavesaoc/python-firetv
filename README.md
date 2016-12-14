@@ -30,6 +30,22 @@ If you want to run on a port other than `5556`:
 
 `firetv-server -p XXXX`
 
+
+### Persistence
+To store multiple Amazon Fire TV devices persistent, you can load a yaml config file:
+`firetv-server -c some/config/file.yaml`
+
+The config file has to be in the following format:
+```yaml
+devices:
+  sleepingroom:
+    host: 192.168.0.13:5555
+  livingroom:
+    host: 192.168.0.16:5555
+```
+
+*Note: If you use -d and -c option together you must not name one of the devices in config file `default` or give one of the devices the same host as in -d option.*
+
 ### Routes
 
 All routes return JSON.
