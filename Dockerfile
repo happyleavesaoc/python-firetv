@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip --no-cache-dir install --upgrade pip
 RUN pip --no-cache-dir install flask
 RUN pip --no-cache-dir install https://pypi.python.org/packages/source/M/M2Crypto/M2Crypto-0.24.0.tar.gz
-RUN pip --no-cache-dir install firetv[firetv-server]
+RUN pip --no-cache-dir install firetv[firetv-server] --process-dependency-links
 
 CMD [ "firetv-server" ]
 

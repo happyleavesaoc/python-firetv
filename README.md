@@ -10,11 +10,11 @@ Install the following ADB dependencies via your package manager:
 
 Be sure you install into a Python 2.x environment.
 
-`pip install firetv`
+`pip install firetv --process-dependency-links`
 
 If you want the HTTP server component installed as a script, use:
 
-`pip install firetv[firetv-server]`
+`pip install firetv[firetv-server] --process-dependency-links`
 
 ## Server
 
