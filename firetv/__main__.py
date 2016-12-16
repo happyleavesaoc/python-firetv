@@ -29,7 +29,7 @@ app = Flask(__name__)
 devices = {}
 config_data = None
 valid_device_id = re.compile('^[-\w]+$')
-valid_app_id = re.compile('^[a-zA-Z][a-z\.A-Z]+$')
+valid_app_id = re.compile('^[A-Za-z0-9\.]+$')
 
 
 def is_valid_host(host):
