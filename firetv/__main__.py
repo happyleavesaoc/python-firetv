@@ -112,13 +112,26 @@ def list_devices():
         }
     return jsonify(devices=output)
 
-
 @app.route('/devices/state/<device_id>', methods=['GET'])
 def device_state(device_id):
     """ Get device state via HTTP GET. """
     if device_id not in devices:
         return jsonify(success=False)
     return jsonify(state=devices[device_id].state)
+
+@app.route('/devices/<device_id>/apps/current', methods=['GET'])
+def current_app(device_id):
+    """ Get currently running app. """
+    if not is_valid_device_id(device_id):
+        abort(403)
+    if device_id not in devices:
+        abort(404)
+
+    current = devices[device_id].current_app
+    if current is None:
+        abort(404)
+
+    return jsonify(current_app=current)
 
 @app.route('/devices/<device_id>/apps/running', methods=['GET'])
 def running_apps(device_id):
@@ -156,7 +169,7 @@ def device_action(device_id, action_id):
             success = True
     return jsonify(success=success)
 
-@app.route('/devices/<device_id>/apps/<app_id>/start' , methods=['GET'])
+@app.route('/devices/<device_id>/apps/<app_id>/start', methods=['GET'])
 def app_start(device_id, app_id):
     """ Starts an app with corresponding package name"""
     if not is_valid_app_id(app_id):
@@ -165,11 +178,11 @@ def app_start(device_id, app_id):
         abort(403)
     if device_id not in devices:
         abort(404)
-    if not devices[device_id].launch_app(app_id):
-        abort(404)
-    return jsonify(success=True)
 
-@app.route('/devices/<device_id>/apps/<app_id>/stop' , methods=['GET'])
+    success = devices[device_id].launch_app(app_id)
+    return jsonify(success=success)
+
+@app.route('/devices/<device_id>/apps/<app_id>/stop', methods=['GET'])
 def app_stop(device_id, app_id):
     """ stops an app with corresponding package name"""
     if not is_valid_app_id(app_id):
@@ -178,8 +191,9 @@ def app_stop(device_id, app_id):
         abort(403)
     if device_id not in devices:
         abort(404)
-    devices[device_id].stop_app(app_id)
-    return jsonify(success=True)
+
+    success = devices[device_id].stop_app(app_id)
+    return jsonify(success=success)
 
 @app.route('/devices/connect/<device_id>', methods=['GET'])
 def device_connect(device_id):
