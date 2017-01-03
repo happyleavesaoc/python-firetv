@@ -6,7 +6,8 @@
 
 Install the following ADB dependencies via your package manager:
 
-`swig libssl-dev python-dev libusb-1.0-0`
+with `apt-get`: `swig libssl-dev python-dev libusb-1.0-0`
+with `yum`: `swig openssl-devel python-devel libusbx-devel`
 
 Be sure you install into a Python 2.x environment.
 
