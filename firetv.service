@@ -1,0 +1,9 @@
+[Unit]
+Description=Fire TV Server
+
+[Service]
+ExecStart=/usr/local/bin/firetv-server
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target

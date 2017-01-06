@@ -12,11 +12,15 @@ with `yum`: `swig openssl-devel python-devel libusbx-devel`
 
 Be sure you install into a Python 2.x environment.
 
-`pip install firetv --process-dependency-links`
+`pip install firetv`
 
 If you want the HTTP server component installed as a script, use:
 
-`pip install firetv[firetv-server] --process-dependency-links`
+`pip install firetv[firetv-server]`
+
+Consider installing `adb` directly from the git repository. It contains bugfixes not in the pip-packaged version:
+
+`pip install git+git://github.com/google/python-adb.git@master`
 
 ## Server
 
@@ -32,6 +36,15 @@ If you want to run on a port other than `5556`:
 
 `firetv-server -p XXXX`
 
+### systemd
+
+Copy the `firetv.service` file to `/etc/systemd/system/`. Modify the `ExecStart` path and arguments as necessary.
+
+```bash
+systemctl enable firetv.service  # Enable on boot
+systemctl start firetv.service   # Start server
+systemctl stop firetv.service    # Stop server
+```
 
 ### Persistence
 To store multiple Amazon Fire TV devices persistent, you can load a yaml config file:
