@@ -7,9 +7,14 @@ ADB Debugging must be enabled.
 """
 
 import errno
+import logging
+import re
 from socket import error as socket_error
 from adb import adb_commands
 from adb.adb_protocol import InvalidChecksumError
+
+# Matches window windows output for app & activity name gathering
+WINDOW_REGEX = re.compile("Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:\/(?P<activity>.+?))?\}$", re.MULTILINE)
 
 # ADB key event codes.
 HOME = 3
@@ -37,6 +42,11 @@ STATE_PLAYING = 'play'
 STATE_PAUSED = 'pause'
 STATE_STANDBY = 'standby'
 STATE_DISCONNECTED = 'disconnected'
+
+PACKAGE_LAUNCHER = "com.amazon.tv.launcher"
+INTENT_LAUNCH = "android.intent.category.LAUNCHER"
+INTENT_HOME = "android.intent.category.HOME"
+
 
 class FireTV:
     """ Represents an Amazon Fire TV device. """
@@ -95,7 +105,7 @@ class FireTV:
         """ Informs if application is running """
         if self.state == STATE_OFF or self.state == STATE_DISCONNECTED:
             return STATE_OFF
-        if len(self._ps(app)) > 0:
+        if self.current_app["package"] == app:
             return STATE_ON
         return STATE_OFF
 
@@ -169,20 +179,47 @@ class FireTV:
         """ Send media previous action (results in rewind). """
         self._key(PREVIOUS)
 
+    def _send_intent(self, pkg, intent, count=1):
+        if not self._adb:
+            return None
+
+        cmd = 'monkey -p {} -c {} {}; echo $?'.format(pkg, intent, count)
+        logging.debug("Sending an intent %s to %s (count: %s)", intent, pkg, count)
+
+        # adb shell outputs in weird format, so we cut it into lines,
+        # separate the retcode and return info to the user
+        res = self._adb.Shell(cmd).strip().split("\r\n")
+        retcode = res[-1]
+        output = "\n".join(res[:-1])
+
+        return {"retcode": retcode, "output": output}
+
     def launch_app(self, app):
         if not self._adb:
-            return
-        mainActivity = self._mainActivity(app)
-        if mainActivity:
-            self._adb.Shell('am start -n {0}'.format(mainActivity))
-            return True
-        else:
-            return False
+            return None
+
+        return self._send_intent(app, INTENT_LAUNCH)
 
     def stop_app(self, app):
         if not self._adb:
-            return
-        self._adb.Shell('am force-stop {0}'.format(app))
+            return None
+
+        return self._send_intent(PACKAGE_LAUNCHER, INTENT_HOME)
+
+    @property
+    def current_app(self):
+        current_focus = self._dump("window windows", "mCurrentFocus").replace("\r", "")
+
+        #logging.error("Current: %s", current_focus)
+        #mCurrentFocus = Window{299091cd u0 com.netflix.ninja / com.netflix.ninja.MainActivity}
+
+        matches = WINDOW_REGEX.search(current_focus)
+        if matches:
+            (pkg, activity) = matches.group('package', 'activity')
+            return {"package": pkg, "activity": activity}
+        else:
+            logging.warning("Couldn't get current app, reply was %s", current_focus)
+            return None
 
     @property
     def _screen_on(self):
@@ -202,10 +239,7 @@ class FireTV:
     @property
     def _launcher(self):
         """ Check if the active application is the Amazon TV launcher. """
-        return self._dump_has('window', 'mFocusedApp=AppWindowToken',
-                              'com.amazon.tv.launcher')
-
-
+        return self.current_app["package"] == PACKAGE_LAUNCHER
 
     def _power(self):
         """ Send power action. """
@@ -269,9 +303,6 @@ class FireTV:
                         result.append(line.strip().rsplit(' ',1)[-1])
             return result
         except InvalidChecksumError as e:
-            print e
+            print(e)
             self.connect()
             raise IOError
-
-    def _mainActivity(self, app):
-        return self._adb.Shell(('pm dump {0} | grep -A 1 "MAIN" | grep {0}').format(app)).strip().split(" ")[1]
