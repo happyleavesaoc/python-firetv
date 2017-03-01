@@ -31,8 +31,45 @@ DOWN = 20
 LEFT = 21
 RIGHT = 22
 ENTER = 66
+SPACE = 62
 BACK = 4
 MENU = 1
+KEY_0 = 7
+KEY_1 = 8
+KEY_2 = 9
+KEY_3 = 10
+KEY_4 = 11
+KEY_5 = 12
+KEY_6 = 13
+KEY_7 = 14
+KEY_8 = 15
+KEY_9 = 16
+KEY_A = 29
+KEY_B = 30
+KEY_C = 31
+KEY_D = 32
+KEY_E = 33
+KEY_F = 34
+KEY_G = 35
+KEY_H = 36
+KEY_I = 37
+KEY_J = 38
+KEY_K = 39
+KEY_L = 40
+KEY_M = 41
+KEY_N = 42
+KEY_O = 43
+KEY_P = 44
+KEY_Q = 45
+KEY_R = 46
+KEY_S = 47
+KEY_T = 48
+KEY_U = 49
+KEY_V = 50
+KEY_W = 51
+KEY_X = 52
+KEY_Y = 53
+KEY_Z = 54
 
 # Fire TV states.
 STATE_ON = 'on'
@@ -178,6 +215,154 @@ class FireTV:
     def media_previous(self):
         """ Send media previous action (results in rewind). """
         self._key(PREVIOUS)
+		
+    def space(self):
+        """ Send space keypress. """
+        self._key(SPACE)
+		
+    def key_0(self):
+        """ Send 0 keypress. """
+        self._key(KEY_0)
+		
+    def key_1(self):
+        """ Send 1 keypress. """
+        self._key(KEY_1)
+		
+    def key_2(self):
+        """ Send 2 keypress. """
+        self._key(KEY_2)
+		
+    def key_3(self):
+        """ Send 3 keypress. """
+        self._key(KEY_3)
+		
+    def key_4(self):
+        """ Send 4 keypress. """
+        self._key(KEY_4)
+		
+    def key_5(self):
+        """ Send 5 keypress. """
+        self._key(KEY_5)
+		
+    def key_6(self):
+        """ Send 6 keypress. """
+        self._key(KEY_6)
+		
+    def key_7(self):
+        """ Send 7 keypress. """
+        self._key(KEY_7)
+		
+    def key_8(self):
+        """ Send 8 keypress. """
+        self._key(KEY_8)
+		
+    def key_9(self):
+        """ Send 9 keypress. """
+        self._key(KEY_9)
+		
+    def key_a(self):
+        """ Send a keypress. """
+        self._key(KEY_A)
+		
+    def key_b(self):
+        """ Send b keypress. """
+        self._key(KEY_B)
+		
+    def key_c(self):
+        """ Send c keypress. """
+        self._key(KEY_C)
+		
+    def key_d(self):
+        """ Send d keypress. """
+        self._key(KEY_D)
+		
+    def key_e(self):
+        """ Send e keypress. """
+        self._key(KEY_E)
+		
+    def key_f(self):
+        """ Send f keypress. """
+        self._key(KEY_F)
+		
+    def key_g(self):
+        """ Send g keypress. """
+        self._key(KEY_G)
+		
+    def key_h(self):
+        """ Send h keypress. """
+        self._key(KEY_H)
+		
+    def key_i(self):
+        """ Send i keypress. """
+        self._key(KEY_I)	
+	
+    def key_j(self):
+        """ Send j keypress. """
+        self._key(KEY_J)
+		
+    def key_k(self):
+        """ Send k keypress. """
+        self._key(KEY_K)
+		
+    def key_l(self):
+        """ Send l keypress. """
+        self._key(KEY_L)
+		
+    def key_m(self):
+        """ Send m keypress. """
+        self._key(KEY_M)
+		
+    def key_n(self):
+        """ Send n keypress. """
+        self._key(KEY_N)
+		
+    def key_o(self):
+        """ Send o keypress. """
+        self._key(KEY_O)
+		
+    def key_p(self):
+        """ Send p keypress. """
+        self._key(KEY_P)
+		
+    def key_q(self):
+        """ Send q keypress. """
+        self._key(KEY_Q)
+		
+    def key_r(self):
+        """ Send r keypress. """
+        self._key(KEY_R)
+		
+    def key_s(self):
+        """ Send s keypress. """
+        self._key(KEY_S)
+		
+    def key_t(self):
+        """ Send t keypress. """
+        self._key(KEY_T)
+		
+    def key_u(self):
+        """ Send u keypress. """
+        self._key(KEY_U)
+		
+    def key_v(self):
+        """ Send v keypress. """
+        self._key(KEY_V)
+		
+    def key_w(self):
+        """ Send w keypress. """
+        self._key(KEY_W)
+		
+    def key_x(self):
+        """ Send x keypress. """
+        self._key(KEY_X)
+		
+    def key_y(self):
+        """ Send y keypress. """
+        self._key(KEY_Y)
+	
+    def key_z(self):
+        """ Send z keypress. """
+        self._key(KEY_Z)
 
     def _send_intent(self, pkg, intent, count=1):
         if not self._adb:
