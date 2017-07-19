@@ -108,7 +108,7 @@ class FireTV:
                 serial=self.host)
         except socket_error as serr:
             if serr.errno != errno.ECONNREFUSED:
-                raise serr
+                logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
 
     @property
     def state(self):
