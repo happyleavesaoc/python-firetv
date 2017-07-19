@@ -107,8 +107,7 @@ class FireTV:
             self._adb = adb_commands.AdbCommands.ConnectDevice(
                 serial=self.host)
         except socket_error as serr:
-            if serr.errno != errno.ECONNREFUSED:
-                logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
+            logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
 
     @property
     def state(self):
