@@ -21,6 +21,7 @@ Find device IP:
 import argparse
 import re
 import yaml
+import logging
 from flask import Flask, jsonify, request, abort
 from firetv import FireTV
 
@@ -54,7 +55,13 @@ def is_valid_device_id(device_id):
     :param device_id: Device identifier
     :returns: Valid or not.
     """
-    return valid_device_id.match(device_id)
+    valid = valid_device_id.match(device_id)
+    if not valid:
+        logging.error("A valid device identifier contains "
+                      "only ascii word characters or dashes. "
+                      "Device '%s' not added.",device_id)
+    return valid
+
 
 def is_valid_app_id(app_id):
     """ check if app identifier is valid.
