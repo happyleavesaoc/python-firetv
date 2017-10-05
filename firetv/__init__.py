@@ -81,6 +81,7 @@ STATE_STANDBY = 'standby'
 STATE_DISCONNECTED = 'disconnected'
 
 PACKAGE_LAUNCHER = "com.amazon.tv.launcher"
+PACKAGE_SETTINGS = "com.amazon.tv.settings"
 INTENT_LAUNCH = "android.intent.category.LAUNCHER"
 INTENT_HOME = "android.intent.category.HOME"
 
@@ -125,7 +126,7 @@ class FireTV:
         if not self._awake:
             return STATE_IDLE
         # Check if the launcher is active.
-        if self._launcher:
+        if self._launcher or self._settings:
             return STATE_STANDBY
         # Check for a wake lock (device is playing).
         if self._wake_lock:
@@ -424,6 +425,11 @@ class FireTV:
     def _launcher(self):
         """ Check if the active application is the Amazon TV launcher. """
         return self.current_app["package"] == PACKAGE_LAUNCHER
+
+    @property
+    def _settings(self):
+        """ Check if the active application is the Amazon menu. """
+        return self.current_app["package"] == PACKAGE_SETTINGS
 
     def _power(self):
         """ Send power action. """
