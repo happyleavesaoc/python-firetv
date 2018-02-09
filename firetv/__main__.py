@@ -33,7 +33,7 @@ valid_device_id = re.compile('^[-\w]+$')
 valid_app_id = re.compile('^[A-Za-z0-9\.]+$')
 
 
-def is_valid_host(host):
+def is_valid_host(host: str):
     """ Check if host is valid.
 
     Performs two simple checks:
@@ -44,7 +44,7 @@ def is_valid_host(host):
     :returns: Valid or not.
     """
     parts = host.split(':')
-    return not (len(parts) != 2 or not parts[1].isdigit())
+    return len(parts) == 2 or parts[1].isdigit()
 
 
 def is_valid_device_id(device_id):
@@ -59,7 +59,7 @@ def is_valid_device_id(device_id):
     if not valid:
         logging.error("A valid device identifier contains "
                       "only ascii word characters or dashes. "
-                      "Device '%s' not added.",device_id)
+                      "Device '%s' not added.", device_id)
     return valid
 
 
@@ -74,7 +74,7 @@ def is_valid_app_id(app_id):
     """
     return valid_app_id.match(app_id)
 
-def add(device_id, host):
+def add(device_id, host: str):
     """ Add a device.
 
     Creates FireTV instance associated with device identifier.
