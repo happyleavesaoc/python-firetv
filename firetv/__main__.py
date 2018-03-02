@@ -33,7 +33,7 @@ valid_device_id = re.compile('^[-\w]+$')
 valid_app_id = re.compile('^[A-Za-z0-9\.]+$')
 
 
-def is_valid_host(host: str):
+def is_valid_host(host):
     """ Check if host is valid.
 
     Performs two simple checks:
@@ -74,7 +74,7 @@ def is_valid_app_id(app_id):
     """
     return valid_app_id.match(app_id)
 
-def add(device_id, host: str):
+def add(device_id, host):
     """ Add a device.
 
     Creates FireTV instance associated with device identifier.
