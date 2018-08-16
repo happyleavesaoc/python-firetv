@@ -6,11 +6,12 @@ Communicate with an Amazon Fire TV device via ADB over a network.
 ADB Debugging must be enabled.
 """
 
-import errno
 import logging
 import re
 from socket import error as socket_error
+
 from adb import adb_commands
+from adb import sign_m2crypto
 from adb.adb_protocol import InvalidChecksumError
 
 # Matches window windows output for app & activity name gathering
@@ -89,12 +90,14 @@ INTENT_HOME = "android.intent.category.HOME"
 class FireTV:
     """ Represents an Amazon Fire TV device. """
 
-    def __init__(self, host):
+    def __init__(self, host, adbkey=''):
         """ Initialize FireTV object.
 
         :param host: Host in format <address>:port.
+        :param adbkey: The path to the "adbkey" file
         """
         self.host = host
+        self.adbkey = adbkey
         self._adb = None
         self.connect()
 
@@ -105,8 +108,14 @@ class FireTV:
         Failure sets state to DISCONNECTED and disables sending actions.
         """
         try:
-            self._adb = adb_commands.AdbCommands.ConnectDevice(
-                serial=self.host)
+            if self.adbkey:
+                signer = sign_m2crypto.M2CryptoSigner(self.adbkey)
+
+                # Connect to the device
+                device = adb_commands.AdbCommands()
+                self._adb = device.ConnectDevice(serial=self.host, rsa_keys=[signer])
+            else:
+                self._adb = adb_commands.AdbCommands.ConnectDevice(serial=self.host)
         except socket_error as serr:
             logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
 
