@@ -230,7 +230,7 @@ def _add_devices_from_config(args):
                 raise ValueError('devicename "default" in config is not allowed if default param is set')
             if config['devices'][device]['host'] == args.default:
                 raise ValueError('host set in default param must not be defined in config')
-        add(device, config['devices'][device]['host'])
+        add(device, config['devices'][device]['host'], config['devices'][device]['adbkey'])
 
 def main():
     """ Set up the server. """
