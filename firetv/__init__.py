@@ -112,10 +112,9 @@ class FireTV:
                 signer = sign_m2crypto.M2CryptoSigner(self.adbkey)
 
                 # Connect to the device
-                device = adb_commands.AdbCommands()
-                self._adb = device.ConnectDevice(serial=self.host, rsa_keys=[signer])
+                self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer])
             else:
-                self._adb = adb_commands.AdbCommands.ConnectDevice(serial=self.host)
+                self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host)
         except socket_error as serr:
             logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
 
