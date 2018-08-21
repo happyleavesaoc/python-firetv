@@ -11,8 +11,11 @@ import re
 from socket import error as socket_error
 
 from adb import adb_commands
-from adb import sign_m2crypto
+from adb.sign_pythonrsa import PythonRSASigner
 from adb.adb_protocol import InvalidChecksumError
+
+
+Signer = PythonRSASigner.FromRSAKeyPath
 
 # Matches window windows output for app & activity name gathering
 WINDOW_REGEX = re.compile("Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:\/(?P<activity>.+?))?\}$", re.MULTILINE)
@@ -109,7 +112,7 @@ class FireTV:
         """
         try:
             if self.adbkey:
-                signer = sign_m2crypto.M2CryptoSigner(self.adbkey)
+                signer = Signer(self.adbkey)
 
                 # Connect to the device
                 self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer])
