@@ -9,7 +9,7 @@ setup(
     author='happyleaves',
     author_email='happyleaves.tfr@gmail.com',
     packages=['firetv'],
-    install_requires=['https://github.com/JeffLIrion/python-adb/zipball/master#adb==1.3.0.dev'],
+    install_requires=['adb==1.3.0.dev'],
     extras_require={
         'firetv-server': ['Flask>=0.10.1', 'PyYAML>=3.12']
     },
