@@ -74,18 +74,19 @@ def is_valid_app_id(app_id):
     """
     return valid_app_id.match(app_id)
 
-def add(device_id, host):
+def add(device_id, host, adbkey=''):
     """ Add a device.
 
     Creates FireTV instance associated with device identifier.
 
     :param device_id: Device identifier.
     :param host: Host in <address>:<port> format.
+    :param adbkey: The path to the "adbkey" file
     :returns: Added successfully or not.
     """
     valid = is_valid_device_id(device_id) and is_valid_host(host)
     if valid:
-        devices[device_id] = FireTV(str(host))
+        devices[device_id] = FireTV(str(host), str(adbkey))
     return valid
 
 
@@ -97,14 +98,15 @@ def add_device():
 
         {
             "device_id": "<your_device_id>",
-            "host": "<address>:<port>"
+            "host": "<address>:<port>",
+            "adbkey": "<path to the adbkey file>"
         }
 
     """
     req = request.get_json()
     success = False
     if 'device_id' in req and 'host' in req:
-        success = add(req['device_id'], req['host'])
+        success = add(req['device_id'], req['host'], req['adbkey'])
     return jsonify(success=success)
 
 
@@ -228,7 +230,7 @@ def _add_devices_from_config(args):
                 raise ValueError('devicename "default" in config is not allowed if default param is set')
             if config['devices'][device]['host'] == args.default:
                 raise ValueError('host set in default param must not be defined in config')
-        add(device, config['devices'][device]['host'])
+        add(device, config['devices'][device]['host'], config['devices'][device]['adbkey'])
 
 def main():
     """ Set up the server. """
