@@ -25,6 +25,7 @@ HOME = 3
 VOLUME_UP = 24
 VOLUME_DOWN = 25
 POWER = 26
+SLEEP = 223
 PLAY_PAUSE = 85
 NEXT = 87
 PREVIOUS = 88
@@ -165,7 +166,7 @@ class FireTV:
     def turn_off(self):
         """ Send power action if device is not off. """
         if self._adb and self._screen_on:
-            self._power()
+            self._key(SLEEP)
 
     def home(self):
         """ Send home action. """
