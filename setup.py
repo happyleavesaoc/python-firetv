@@ -2,14 +2,14 @@ from setuptools import setup
 
 setup(
     name='firetv',
-    version='1.0.5.3',
+    version='1.0.6',
     description='Communicate with an Amazon Fire TV device via ADB over a network.',
     url='https://github.com/happyleavesaoc/python-firetv/',
     license='MIT',
     author='happyleaves',
     author_email='happyleaves.tfr@gmail.com',
     packages=['firetv'],
-    install_requires=['pycryptodome', 'rsa', 'adb>=1.3.0'],
+    install_requires=['pycryptodome', 'rsa', 'adb>1.3.0'],
     extras_require={
         'firetv-server': ['Flask>=0.10.1', 'PyYAML>=3.12']
     },
@@ -22,5 +22,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 3'
     ]
 )
