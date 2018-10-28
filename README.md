@@ -1,6 +1,6 @@
 # python-firetv
 
-`firetv` is a Python 2.x package that provides state information and some control of an Amazon Fire TV device over a network. This is achieved via ADB, so therefore requires [ADB Debugging](https://developer.amazon.com/public/solutions/devices/fire-tv/docs/connecting-adb-over-network) to be turned on. It includes `firetv-server`, an HTTP server to facilitate RESTful access to configured devices.
+`firetv` is a Python 2 and 3 package that provides state information and some control of an Amazon Fire TV device over a network. This is achieved via ADB, so therefore requires [ADB Debugging](https://developer.amazon.com/public/solutions/devices/fire-tv/docs/connecting-adb-over-network) to be turned on. It includes `firetv-server`, an HTTP server to facilitate RESTful access to configured devices.
 
 ## Installation
 
@@ -10,7 +10,7 @@ with `apt-get`: `swig libssl-dev python-dev libusb-1.0-0`
 
 with `yum`: `swig openssl-devel python-devel libusbx-devel`
 
-Be sure you install into a Python 2.x environment.
+Install the package using the command:
 
 `pip install firetv`
 
@@ -128,9 +128,6 @@ You can start or stop an app with the following commands:
 - `GET /devices/<device_id>/apps/<app_id>/stop` 
 
 app_id must be a package name, e.g. org.xbmc.kodi or com.netflix.ninja
-
-## Python 3
-`firetv` depends on [python-adb](https://github.com/google/python-adb), a pure-python implementation of the ADB protocol. It and its dependency [M2Crypto](https://github.com/martinpaljak/M2Crypto) are written for Python 2. Until they support Python 3, or an alternative is available, `firetv` will not support Python 3. The HTTP server is provided as a way for Python 3 (or other) software to utilize the features of `firetv`.
 
 ## Contribution
 
