@@ -180,9 +180,6 @@ class FireTV:
     def current_app(self):
         current_focus = self._dump("window windows", "mCurrentFocus").replace("\r", "")
 
-        #logging.error("Current: %s", current_focus)
-        #mCurrentFocus = Window{299091cd u0 com.netflix.ninja / com.netflix.ninja.MainActivity}
-
         matches = WINDOW_REGEX.search(current_focus)
         if matches:
             (pkg, activity) = matches.group('package', 'activity')
