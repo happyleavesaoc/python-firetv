@@ -318,7 +318,6 @@ class FireTV:
     #                      "key" methods: basic commands                      #
     #                                                                         #
     # ======================================================================= #
-
     def power(self):
         """ Send power action. """
         self._key(POWER)
