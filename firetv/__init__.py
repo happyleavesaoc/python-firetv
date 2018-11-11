@@ -111,14 +111,12 @@ class FireTV:
         Will attempt to establish ADB connection to the given host.
         Failure sets state to UNKNOWN and disables sending actions.
         """
-        try:
-            if self.adbkey:
-                signer = Signer(self.adbkey)
+        kwargs = {'serial': self.host}
+        if self.adbkey:
+            kwargs['rsa_keys'] = [Signer(self.adbkey)]
 
-                # Connect to the device
-                self.adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer])
-            else:
-                self.adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host)
+        try:
+            self.adb = adb_commands.AdbCommands().ConnectDevice(**kwargs)
         except socket_error as serr:
             logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
 
