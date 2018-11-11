@@ -80,8 +80,8 @@ KEY_Z = 54
 STATE_ON = 'on'
 STATE_IDLE = 'idle'
 STATE_OFF = 'off'
-STATE_PLAYING = 'play'
-STATE_PAUSED = 'pause'
+STATE_PLAYING = 'playing'
+STATE_PAUSED = 'paused'
 STATE_STANDBY = 'standby'
 STATE_UNKNOWN = 'unknown'
 
