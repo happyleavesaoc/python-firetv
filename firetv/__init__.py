@@ -102,7 +102,7 @@ class FireTV:
         """
         self.host = host
         self.adbkey = adbkey
-        self.adb = None
+        self._adb = None
         self.connect()
 
     def connect(self):
@@ -116,26 +116,26 @@ class FireTV:
             kwargs['rsa_keys'] = [Signer(self.adbkey)]
 
         try:
-            self.adb = adb_commands.AdbCommands().ConnectDevice(**kwargs)
+            self._adb = adb_commands.AdbCommands().ConnectDevice(**kwargs)
         except socket_error as serr:
             logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
 
     def app_state(self, app):
         """ Informs if application is running """
-        if not self.adb or not self.screen_on:
+        if not self._adb or not self.screen_on:
             return STATE_OFF
         if self.current_app["package"] == app:
             return STATE_ON
         return STATE_OFF
 
     def launch_app(self, app):
-        if not self.adb:
+        if not self._adb:
             return None
 
         return self._send_intent(app, INTENT_LAUNCH)
 
     def stop_app(self, app):
-        if not self.adb:
+        if not self._adb:
             return None
 
         return self._send_intent(PACKAGE_LAUNCHER, INTENT_HOME)
@@ -152,7 +152,7 @@ class FireTV:
         :returns: Device state.
         """
         # Check if device is disconnected.
-        if not self.adb:
+        if not self._adb:
             return STATE_UNKNOWN
         # Check if device is off.
         if not self.screen_on:
@@ -168,6 +168,11 @@ class FireTV:
             return STATE_PLAYING
         # Otherwise, device is paused.
         return STATE_PAUSED
+
+    @property
+    def available(self):
+        """ Check whether the ADB connection is intact. """
+        return bool(self._adb)
 
     @property
     def running_apps(self):
@@ -223,11 +228,11 @@ class FireTV:
         :param grep: Grep for this string.
         :returns: Dump, optionally grepped.
         """
-        if not self.adb:
+        if not self._adb:
             return
         if grep:
-            return self.adb.Shell('dumpsys {0} | grep "{1}"'.format(service, grep))
-        return self.adb.Shell('dumpsys {0}'.format(service))
+            return self._adb.Shell('dumpsys {0} | grep "{1}"'.format(service, grep))
+        return self._adb.Shell('dumpsys {0}'.format(service))
 
     def _dump_has(self, service, grep, search):
         """ Check if a dump has particular content.
@@ -244,9 +249,9 @@ class FireTV:
 
         :param cmd: Input command.
         """
-        if not self.adb:
+        if not self._adb:
             return
-        self.adb.Shell('input {0}'.format(cmd))
+        self._adb.Shell('input {0}'.format(cmd))
 
     def _key(self, key):
         """ Send a key event to device.
@@ -261,10 +266,10 @@ class FireTV:
         :param search: Check for this substring.
         :returns: List of matching fields
         """
-        if not self.adb:
+        if not self._adb:
             return
         result = []
-        ps = self.adb.StreamingShell('ps')
+        ps = self._adb.StreamingShell('ps')
         try:
             for bad_line in ps:
                 # The splitting of the StreamingShell doesn't always work
@@ -279,7 +284,7 @@ class FireTV:
             raise IOError
 
     def _send_intent(self, pkg, intent, count=1):
-        if not self.adb:
+        if not self._adb:
             return None
 
         cmd = 'monkey -p {} -c {} {}; echo $?'.format(pkg, intent, count)
@@ -287,7 +292,7 @@ class FireTV:
 
         # adb shell outputs in weird format, so we cut it into lines,
         # separate the retcode and return info to the user
-        res = self.adb.Shell(cmd).strip().split("\r\n")
+        res = self._adb.Shell(cmd).strip().split("\r\n")
         retcode = res[-1]
         output = "\n".join(res[:-1])
 
@@ -300,12 +305,12 @@ class FireTV:
     # ======================================================================= #
     def turn_on(self):
         """ Send power action if device is off. """
-        if self.adb and not self.screen_on:
+        if self._adb and not self.screen_on:
             self.power()
 
     def turn_off(self):
         """ Send power action if device is not off. """
-        if self.adb and self.screen_on:
+        if self._adb and self.screen_on:
             self.sleep()
 
     # ======================================================================= #
