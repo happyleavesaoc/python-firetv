@@ -102,7 +102,7 @@ class FireTV:
         """
         self.host = host
         self.adbkey = adbkey
-        self._adb = None
+        self.adb = None
         self.connect()
 
     def connect(self):
@@ -116,9 +116,9 @@ class FireTV:
                 signer = Signer(self.adbkey)
 
                 # Connect to the device
-                self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer])
+                self.adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer])
             else:
-                self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host)
+                self.adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host)
         except socket_error as serr:
             logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
 
@@ -129,19 +129,19 @@ class FireTV:
         :returns: Device state.
         """
         # Check if device is disconnected.
-        if not self._adb:
+        if not self.adb:
             return STATE_UNKNOWN
         # Check if device is off.
-        if not self._screen_on:
+        if not self.screen_on:
             return STATE_OFF
         # Check if screen saver is on.
-        if not self._awake:
+        if not self.awake:
             return STATE_IDLE
         # Check if the launcher is active.
-        if self._launcher or self._settings:
+        if self.launcher or self.settings:
             return STATE_STANDBY
         # Check for a wake lock (device is playing).
-        if self._wake_lock:
+        if self.wake_lock:
             return STATE_PLAYING
         # Otherwise, device is paused.
         return STATE_PAUSED
@@ -152,7 +152,7 @@ class FireTV:
 
     def app_state(self, app):
         """ Informs if application is running """
-        if not self._adb or not self._screen_on:
+        if not self.adb or not self.screen_on:
             return STATE_OFF
         if self.current_app["package"] == app:
             return STATE_ON
@@ -160,12 +160,12 @@ class FireTV:
 
     def turn_on(self):
         """ Send power action if device is off. """
-        if self._adb and not self._screen_on:
-            self._power()
+        if self.adb and not self.screen_on:
+            self.power()
 
     def turn_off(self):
         """ Send power action if device is not off. """
-        if self._adb and self._screen_on:
+        if self.adb and self.screen_on:
             self._key(SLEEP)
 
     def home(self):
@@ -377,7 +377,7 @@ class FireTV:
         self._key(KEY_Z)
 
     def _send_intent(self, pkg, intent, count=1):
-        if not self._adb:
+        if not self.adb:
             return None
 
         cmd = 'monkey -p {} -c {} {}; echo $?'.format(pkg, intent, count)
@@ -385,20 +385,20 @@ class FireTV:
 
         # adb shell outputs in weird format, so we cut it into lines,
         # separate the retcode and return info to the user
-        res = self._adb.Shell(cmd).strip().split("\r\n")
+        res = self.adb.Shell(cmd).strip().split("\r\n")
         retcode = res[-1]
         output = "\n".join(res[:-1])
 
         return {"retcode": retcode, "output": output}
 
     def launch_app(self, app):
-        if not self._adb:
+        if not self.adb:
             return None
 
         return self._send_intent(app, INTENT_LAUNCH)
 
     def stop_app(self, app):
-        if not self._adb:
+        if not self.adb:
             return None
 
         return self._send_intent(PACKAGE_LAUNCHER, INTENT_HOME)
@@ -419,31 +419,31 @@ class FireTV:
             return None
 
     @property
-    def _screen_on(self):
+    def screen_on(self):
         """ Check if the screen is on. """
         return self._dump_has('power', 'Display Power', 'state=ON')
 
     @property
-    def _awake(self):
+    def awake(self):
         """ Check if the device is awake (screen saver is not running). """
         return self._dump_has('power', 'mWakefulness', 'Awake')
 
     @property
-    def _wake_lock(self):
+    def wake_lock(self):
         """ Check for wake locks (device is playing). """
         return not self._dump_has('power', 'Locks', 'size=0')
 
     @property
-    def _launcher(self):
+    def launcher(self):
         """ Check if the active application is the Amazon TV launcher. """
         return self.current_app["package"] == PACKAGE_LAUNCHER
 
     @property
-    def _settings(self):
+    def settings(self):
         """ Check if the active application is the Amazon menu. """
         return self.current_app["package"] == PACKAGE_SETTINGS
 
-    def _power(self):
+    def power(self):
         """ Send power action. """
         self._key(POWER)
 
@@ -452,9 +452,9 @@ class FireTV:
 
         :param cmd: Input command.
         """
-        if not self._adb:
+        if not self.adb:
             return
-        self._adb.Shell('input {0}'.format(cmd))
+        self.adb.Shell('input {0}'.format(cmd))
 
     def _key(self, key):
         """ Send a key event to device.
@@ -470,11 +470,11 @@ class FireTV:
         :param grep: Grep for this string.
         :returns: Dump, optionally grepped.
         """
-        if not self._adb:
+        if not self.adb:
             return
         if grep:
-            return self._adb.Shell('dumpsys {0} | grep "{1}"'.format(service, grep))
-        return self._adb.Shell('dumpsys {0}'.format(service))
+            return self.adb.Shell('dumpsys {0} | grep "{1}"'.format(service, grep))
+        return self.adb.Shell('dumpsys {0}'.format(service))
 
     def _dump_has(self, service, grep, search):
         """ Check if a dump has particular content.
@@ -492,10 +492,10 @@ class FireTV:
         :param search: Check for this substring.
         :returns: List of matching fields
         """
-        if not self._adb:
+        if not self.adb:
             return
         result = []
-        ps = self._adb.StreamingShell('ps')
+        ps = self.adb.StreamingShell('ps')
         try:
             for bad_line in ps:
                 # The splitting of the StreamingShell doesn't always work
