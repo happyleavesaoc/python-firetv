@@ -146,6 +146,7 @@ class FireTV:
         # Otherwise, device is paused.
         return STATE_PAUSED
 
+    @property
     def running_apps(self):
         """ Return an array of running user applications """
         return self._ps('u0_a')
