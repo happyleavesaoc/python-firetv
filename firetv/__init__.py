@@ -167,7 +167,7 @@ class FireTV:
     def turn_off(self):
         """ Send power action if device is not off. """
         if self.adb and self.screen_on:
-            self._key(SLEEP)
+            self.sleep()
 
     def home(self):
         """ Send home action. """
@@ -447,6 +447,10 @@ class FireTV:
     def power(self):
         """ Send power action. """
         self._key(POWER)
+
+    def sleep(self):
+        """ Send sleep action. """
+        self._key(SLEEP)
 
     def _input(self, cmd):
         """ Send input to the device.
