@@ -106,7 +106,7 @@ def add_device():
     req = request.get_json()
     success = False
     if 'device_id' in req and 'host' in req:
-        success = add(req['device_id'], req['host'], req['adbkey'])
+        success = add(req['device_id'], req['host'], req.get('adbkey', ''))
     return jsonify(success=success)
 
 
@@ -149,7 +149,7 @@ def running_apps(device_id):
         abort(403)
     if device_id not in devices:
         abort(404)
-    return jsonify(running_apps=devices[device_id].running_apps())
+    return jsonify(running_apps=devices[device_id].running_apps)
 
 @app.route('/devices/<device_id>/apps/state/<app_id>', methods=['GET'])
 def get_app_state(device_id, app_id):
@@ -230,7 +230,7 @@ def _add_devices_from_config(args):
                 raise ValueError('devicename "default" in config is not allowed if default param is set')
             if config['devices'][device]['host'] == args.default:
                 raise ValueError('host set in default param must not be defined in config')
-        add(device, config['devices'][device]['host'], config['devices'][device]['adbkey'])
+        add(device, config['devices'][device]['host'], config['devices'][device].get('adbkey', ''))
 
 def main():
     """ Set up the server. """

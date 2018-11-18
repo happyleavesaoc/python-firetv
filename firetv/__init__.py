@@ -80,8 +80,8 @@ KEY_Z = 54
 STATE_ON = 'on'
 STATE_IDLE = 'idle'
 STATE_OFF = 'off'
-STATE_PLAYING = 'play'
-STATE_PAUSED = 'pause'
+STATE_PLAYING = 'playing'
+STATE_PAUSED = 'paused'
 STATE_STANDBY = 'standby'
 STATE_UNKNOWN = 'unknown'
 
@@ -111,17 +111,40 @@ class FireTV:
         Will attempt to establish ADB connection to the given host.
         Failure sets state to UNKNOWN and disables sending actions.
         """
-        try:
-            if self.adbkey:
-                signer = Signer(self.adbkey)
+        kwargs = {'serial': self.host}
+        if self.adbkey:
+            kwargs['rsa_keys'] = [Signer(self.adbkey)]
 
-                # Connect to the device
-                self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer])
-            else:
-                self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host)
+        try:
+            self._adb = adb_commands.AdbCommands().ConnectDevice(**kwargs)
         except socket_error as serr:
             logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
 
+    def app_state(self, app):
+        """ Informs if application is running """
+        if not self._adb or not self.screen_on:
+            return STATE_OFF
+        if self.current_app["package"] == app:
+            return STATE_ON
+        return STATE_OFF
+
+    def launch_app(self, app):
+        if not self._adb:
+            return None
+
+        return self._send_intent(app, INTENT_LAUNCH)
+
+    def stop_app(self, app):
+        if not self._adb:
+            return None
+
+        return self._send_intent(PACKAGE_LAUNCHER, INTENT_HOME)
+
+    # ======================================================================= #
+    #                                                                         #
+    #                               properties                                #
+    #                                                                         #
+    # ======================================================================= #
     @property
     def state(self):
         """ Compute and return the device state.
@@ -132,41 +155,176 @@ class FireTV:
         if not self._adb:
             return STATE_UNKNOWN
         # Check if device is off.
-        if not self._screen_on:
+        if not self.screen_on:
             return STATE_OFF
         # Check if screen saver is on.
-        if not self._awake:
+        if not self.awake:
             return STATE_IDLE
         # Check if the launcher is active.
-        if self._launcher or self._settings:
+        if self.launcher or self.settings:
             return STATE_STANDBY
         # Check for a wake lock (device is playing).
-        if self._wake_lock:
+        if self.wake_lock:
             return STATE_PLAYING
         # Otherwise, device is paused.
         return STATE_PAUSED
 
+    @property
+    def available(self):
+        """ Check whether the ADB connection is intact. """
+        return bool(self._adb)
+
+    @property
     def running_apps(self):
         """ Return an array of running user applications """
         return self._ps('u0_a')
 
-    def app_state(self, app):
-        """ Informs if application is running """
-        if not self._adb or not self._screen_on:
-            return STATE_OFF
-        if self.current_app["package"] == app:
-            return STATE_ON
-        return STATE_OFF
+    @property
+    def current_app(self):
+        current_focus = self._dump("window windows", "mCurrentFocus").replace("\r", "")
 
+        matches = WINDOW_REGEX.search(current_focus)
+        if matches:
+            (pkg, activity) = matches.group('package', 'activity')
+            return {"package": pkg, "activity": activity}
+        else:
+            logging.warning("Couldn't get current app, reply was %s", current_focus)
+            return None
+
+    @property
+    def screen_on(self):
+        """ Check if the screen is on. """
+        return self._dump_has('power', 'Display Power', 'state=ON')
+
+    @property
+    def awake(self):
+        """ Check if the device is awake (screen saver is not running). """
+        return self._dump_has('power', 'mWakefulness', 'Awake')
+
+    @property
+    def wake_lock(self):
+        """ Check for wake locks (device is playing). """
+        return not self._dump_has('power', 'Locks', 'size=0')
+
+    @property
+    def launcher(self):
+        """ Check if the active application is the Amazon TV launcher. """
+        return self.current_app["package"] == PACKAGE_LAUNCHER
+
+    @property
+    def settings(self):
+        """ Check if the active application is the Amazon menu. """
+        return self.current_app["package"] == PACKAGE_SETTINGS
+
+    # ======================================================================= #
+    #                                                                         #
+    #                               ADB methods                               #
+    #                                                                         #
+    # ======================================================================= #
+    def _dump(self, service, grep=None):
+        """ Perform a service dump.
+
+        :param service: Service to dump.
+        :param grep: Grep for this string.
+        :returns: Dump, optionally grepped.
+        """
+        if not self._adb:
+            return
+        if grep:
+            return self._adb.Shell('dumpsys {0} | grep "{1}"'.format(service, grep))
+        return self._adb.Shell('dumpsys {0}'.format(service))
+
+    def _dump_has(self, service, grep, search):
+        """ Check if a dump has particular content.
+
+        :param service: Service to dump.
+        :param grep: Grep for this string.
+        :param search: Check for this substring.
+        :returns: Found or not.
+        """
+        return self._dump(service, grep=grep).strip().find(search) > -1
+
+    def _input(self, cmd):
+        """ Send input to the device.
+
+        :param cmd: Input command.
+        """
+        if not self._adb:
+            return
+        self._adb.Shell('input {0}'.format(cmd))
+
+    def _key(self, key):
+        """ Send a key event to device.
+
+        :param key: Key constant.
+        """
+        self._input('keyevent {0}'.format(key))
+
+    def _ps(self, search=''):
+        """ Perform a ps command with optional filtering.
+
+        :param search: Check for this substring.
+        :returns: List of matching fields
+        """
+        if not self._adb:
+            return
+        result = []
+        ps = self._adb.StreamingShell('ps')
+        try:
+            for bad_line in ps:
+                # The splitting of the StreamingShell doesn't always work
+                # this is to ensure that we get only one line
+                for line in bad_line.splitlines():
+                    if search in line:
+                        result.append(line.strip().rsplit(' ',1)[-1])
+            return result
+        except InvalidChecksumError as e:
+            print(e)
+            self.connect()
+            raise IOError
+
+    def _send_intent(self, pkg, intent, count=1):
+        if not self._adb:
+            return None
+
+        cmd = 'monkey -p {} -c {} {}; echo $?'.format(pkg, intent, count)
+        logging.debug("Sending an intent %s to %s (count: %s)", intent, pkg, count)
+
+        # adb shell outputs in weird format, so we cut it into lines,
+        # separate the retcode and return info to the user
+        res = self._adb.Shell(cmd).strip().split("\r\n")
+        retcode = res[-1]
+        output = "\n".join(res[:-1])
+
+        return {"retcode": retcode, "output": output}
+
+    # ======================================================================= #
+    #                                                                         #
+    #                           turn on/off methods                           #
+    #                                                                         #
+    # ======================================================================= #
     def turn_on(self):
         """ Send power action if device is off. """
-        if self._adb and not self._screen_on:
-            self._power()
+        if self._adb and not self.screen_on:
+            self.power()
 
     def turn_off(self):
         """ Send power action if device is not off. """
-        if self._adb and self._screen_on:
-            self._key(SLEEP)
+        if self._adb and self.screen_on:
+            self.sleep()
+
+    # ======================================================================= #
+    #                                                                         #
+    #                      "key" methods: basic commands                      #
+    #                                                                         #
+    # ======================================================================= #
+    def power(self):
+        """ Send power action. """
+        self._key(POWER)
+
+    def sleep(self):
+        """ Send sleep action. """
+        self._key(SLEEP)
 
     def home(self):
         """ Send home action. """
@@ -196,6 +354,10 @@ class FireTV:
         """ Send back action. """
         self._key(BACK)
 
+    def space(self):
+        """ Send space keypress. """
+        self._key(SPACE)
+
     def menu(self):
         """ Send menu action. """
         self._key(MENU)
@@ -208,6 +370,11 @@ class FireTV:
         """ Send volume down action. """
         self._key(VOLUME_DOWN)
 
+    # ======================================================================= #
+    #                                                                         #
+    #                      "key" methods: media commands                      #
+    #                                                                         #
+    # ======================================================================= #
     def media_play_pause(self):
         """ Send media play/pause action. """
         self._key(PLAY_PAUSE)
@@ -228,10 +395,11 @@ class FireTV:
         """ Send media previous action (results in rewind). """
         self._key(PREVIOUS)
 
-    def space(self):
-        """ Send space keypress. """
-        self._key(SPACE)
-
+    # ======================================================================= #
+    #                                                                         #
+    #                       "key" methods: key commands                       #
+    #                                                                         #
+    # ======================================================================= #
     def key_0(self):
         """ Send 0 keypress. """
         self._key(KEY_0)
@@ -375,136 +543,3 @@ class FireTV:
     def key_z(self):
         """ Send z keypress. """
         self._key(KEY_Z)
-
-    def _send_intent(self, pkg, intent, count=1):
-        if not self._adb:
-            return None
-
-        cmd = 'monkey -p {} -c {} {}; echo $?'.format(pkg, intent, count)
-        logging.debug("Sending an intent %s to %s (count: %s)", intent, pkg, count)
-
-        # adb shell outputs in weird format, so we cut it into lines,
-        # separate the retcode and return info to the user
-        res = self._adb.Shell(cmd).strip().split("\r\n")
-        retcode = res[-1]
-        output = "\n".join(res[:-1])
-
-        return {"retcode": retcode, "output": output}
-
-    def launch_app(self, app):
-        if not self._adb:
-            return None
-
-        return self._send_intent(app, INTENT_LAUNCH)
-
-    def stop_app(self, app):
-        if not self._adb:
-            return None
-
-        return self._send_intent(PACKAGE_LAUNCHER, INTENT_HOME)
-
-    @property
-    def current_app(self):
-        current_focus = self._dump("window windows", "mCurrentFocus").replace("\r", "")
-
-        #logging.error("Current: %s", current_focus)
-        #mCurrentFocus = Window{299091cd u0 com.netflix.ninja / com.netflix.ninja.MainActivity}
-
-        matches = WINDOW_REGEX.search(current_focus)
-        if matches:
-            (pkg, activity) = matches.group('package', 'activity')
-            return {"package": pkg, "activity": activity}
-        else:
-            logging.warning("Couldn't get current app, reply was %s", current_focus)
-            return None
-
-    @property
-    def _screen_on(self):
-        """ Check if the screen is on. """
-        return self._dump_has('power', 'Display Power', 'state=ON')
-
-    @property
-    def _awake(self):
-        """ Check if the device is awake (screen saver is not running). """
-        return self._dump_has('power', 'mWakefulness', 'Awake')
-
-    @property
-    def _wake_lock(self):
-        """ Check for wake locks (device is playing). """
-        return not self._dump_has('power', 'Locks', 'size=0')
-
-    @property
-    def _launcher(self):
-        """ Check if the active application is the Amazon TV launcher. """
-        return self.current_app["package"] == PACKAGE_LAUNCHER
-
-    @property
-    def _settings(self):
-        """ Check if the active application is the Amazon menu. """
-        return self.current_app["package"] == PACKAGE_SETTINGS
-
-    def _power(self):
-        """ Send power action. """
-        self._key(POWER)
-
-    def _input(self, cmd):
-        """ Send input to the device.
-
-        :param cmd: Input command.
-        """
-        if not self._adb:
-            return
-        self._adb.Shell('input {0}'.format(cmd))
-
-    def _key(self, key):
-        """ Send a key event to device.
-
-        :param key: Key constant.
-        """
-        self._input('keyevent {0}'.format(key))
-
-    def _dump(self, service, grep=None):
-        """ Perform a service dump.
-
-        :param service: Service to dump.
-        :param grep: Grep for this string.
-        :returns: Dump, optionally grepped.
-        """
-        if not self._adb:
-            return
-        if grep:
-            return self._adb.Shell('dumpsys {0} | grep "{1}"'.format(service, grep))
-        return self._adb.Shell('dumpsys {0}'.format(service))
-
-    def _dump_has(self, service, grep, search):
-        """ Check if a dump has particular content.
-
-        :param service: Service to dump.
-        :param grep: Grep for this string.
-        :param search: Check for this substring.
-        :returns: Found or not.
-        """
-        return self._dump(service, grep=grep).strip().find(search) > -1
-
-    def _ps(self, search=''):
-        """ Perform a ps command with optional filtering.
-
-        :param search: Check for this substring.
-        :returns: List of matching fields
-        """
-        if not self._adb:
-            return
-        result = []
-        ps = self._adb.StreamingShell('ps')
-        try:
-            for bad_line in ps:
-                # The splitting of the StreamingShell doesn't always work
-                # this is to ensure that we get only one line
-                for line in bad_line.splitlines():
-                    if search in line:
-                        result.append(line.strip().rsplit(' ',1)[-1])
-            return result
-        except InvalidChecksumError as e:
-            print(e)
-            self.connect()
-            raise IOError
