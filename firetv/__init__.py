@@ -13,6 +13,7 @@ from socket import error as socket_error
 from adb import adb_commands
 from adb.sign_pythonrsa import PythonRSASigner
 from adb.adb_protocol import InvalidChecksumError
+from adb_messenger.client import Client as AdbClient
 
 
 Signer = PythonRSASigner.FromRSAKeyPath
@@ -94,15 +95,38 @@ INTENT_HOME = "android.intent.category.HOME"
 class FireTV:
     """ Represents an Amazon Fire TV device. """
 
-    def __init__(self, host, adbkey=''):
+    def __init__(self, host, adbkey='', adb_server_ip='', adb_server_port=5037):
         """ Initialize FireTV object.
 
         :param host: Host in format <address>:port.
         :param adbkey: The path to the "adbkey" file
+        :param adb_server_ip: the IP address for the ADB server
+        :param adb_server_port: the port for the ADB server
         """
         self.host = host
         self.adbkey = adbkey
-        self._adb = None
+        self.adb_server_ip = adb_server_ip
+        self.adb_server_port = adb_server_port
+
+        # keep track of whether the ADB connection is intact
+        self._available = False
+
+        # the attributes used for sending ADB commands; filled in in `self.connect()`
+        self._adb = None  # python-adb
+        self._adb_client = None  # pure-python-adb
+        self._adb_device = None  # pure-python-adb
+
+        # the method used for sending ADB commands
+        if not self.adb_server_ip:
+            # python-adb
+            self._adb_shell = self._adb_shell_python_adb
+            self._adb_streaming_shell = self._adb_streaming_shell_python_adb
+        else:
+            # pure-python-adb
+            self._adb_shell = self._adb_shell_pure_python_adb
+            self._adb_streaming_shell = self._adb_streaming_shell_pure_python_adb
+
+        # establish the ADB connection
         self.connect()
 
     def connect(self):
@@ -111,33 +135,56 @@ class FireTV:
         Will attempt to establish ADB connection to the given host.
         Failure sets state to UNKNOWN and disables sending actions.
         """
-        kwargs = {'serial': self.host}
-        if self.adbkey:
-            kwargs['rsa_keys'] = [Signer(self.adbkey)]
+        if not self.adb_server_ip:
+            # python-adb
+            try:
+                if self.adbkey:
+                    signer = Signer(self.adbkey)
 
-        try:
-            self._adb = adb_commands.AdbCommands().ConnectDevice(**kwargs)
-        except socket_error as serr:
-            logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
+                    # Connect to the device
+                    self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer], default_timeout_ms=9000)
+                else:
+                    self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, default_timeout_ms=9000)
+
+                # ADB connection successfully established
+                self._available = True
+
+            except socket_error as serr:
+                self._adb = None
+                if self._available:
+                    self._available = False
+                    if serr.strerror is None:
+                        serr.strerror = "Timed out trying to connect to ADB device."
+                    logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
+
+            finally:
+                return self._available
+
+        else:
+            # pure-python-adb
+            try:
+                self._adb_client = AdbClient(host=self.adb_server_ip, port=self.adb_server_port)
+                self._adb_device = self._adb_client.device(self.host)
+                self._available = bool(self._adb_device)
+
+            except:
+                self._available = False
+
+            finally:
+                return self._available
 
     def app_state(self, app):
         """ Informs if application is running """
-        if not self._adb or not self.screen_on:
+        if not self.available or not self.screen_on:
             return STATE_OFF
         if self.current_app["package"] == app:
             return STATE_ON
         return STATE_OFF
 
     def launch_app(self, app):
-        if not self._adb:
-            return None
-
         return self._send_intent(app, INTENT_LAUNCH)
 
     def stop_app(self, app):
-        if not self._adb:
-            return None
-
         return self._send_intent(PACKAGE_LAUNCHER, INTENT_HOME)
 
     # ======================================================================= #
@@ -152,7 +199,7 @@ class FireTV:
         :returns: Device state.
         """
         # Check if device is disconnected.
-        if not self._adb:
+        if not self.available:
             return STATE_UNKNOWN
         # Check if device is off.
         if not self.screen_on:
@@ -172,7 +219,40 @@ class FireTV:
     @property
     def available(self):
         """ Check whether the ADB connection is intact. """
-        return bool(self._adb)
+        if not self.adb_server_ip:
+            # python-adb
+            return bool(self._adb)
+
+        # pure-python-adb
+        try:
+            # make sure the server is available
+            adb_devices = self._adb_client.devices()
+
+            # make sure the device is available
+            try:
+                # case 1: the device is currently available
+                if any([self.host in dev.get_serial_no() for dev in adb_devices]):
+                    if not self._available:
+                        self._available = True
+                    return True
+
+                # case 2: the device is not currently available
+                if self._available:
+                    logging.error('ADB server is not connected to the device.')
+                    self._available = False
+                return False
+
+            except RuntimeError:
+                if self._available:
+                    logging.error('ADB device is unavailable; encountered an error when searching for device.')
+                    self._available = False
+                return False
+
+        except RuntimeError:
+            if self._available:
+                logging.error('ADB server is unavailable.')
+                self._available = False
+            return False
 
     @property
     def running_apps(self):
@@ -181,15 +261,21 @@ class FireTV:
 
     @property
     def current_app(self):
-        current_focus = self._dump("window windows", "mCurrentFocus").replace("\r", "")
-
-        matches = WINDOW_REGEX.search(current_focus)
-        if matches:
-            (pkg, activity) = matches.group('package', 'activity')
-            return {"package": pkg, "activity": activity}
-        else:
-            logging.warning("Couldn't get current app, reply was %s", current_focus)
+        current_focus = self._dump("window windows", "mCurrentFocus")
+        if current_focus is None:
             return None
+
+        current_focus = current_focus.replace("\r", "")
+        matches = WINDOW_REGEX.search(current_focus)
+
+        # case 1: current app was successfully found
+        if matches:
+            (pkg, activity) = matches.group("package", "activity")
+            return {"package": pkg, "activity": activity}
+
+        # case 2: current app could not be found
+        logging.warning("Couldn't get current app, reply was %s", current_focus)
+        return None
 
     @property
     def screen_on(self):
@@ -221,6 +307,27 @@ class FireTV:
     #                               ADB methods                               #
     #                                                                         #
     # ======================================================================= #
+    def _adb_shell_python_adb(self, cmd):
+        if not self.available:
+            return None
+        return self._adb.Shell(cmd)
+
+    def _adb_shell_pure_python_adb(self, cmd):
+        if not self._available:
+            return None
+        return self._adb_device.shell(cmd)
+
+    def _adb_streaming_shell_python_adb(self, cmd):
+        if not self.available:
+            return []
+        return self._adb.StreamingShell(cmd)
+
+    def _adb_streaming_shell_pure_python_adb(self, cmd):
+        if not self._available:
+            return None
+        # this is not yet implemented
+        return []
+
     def _dump(self, service, grep=None):
         """ Perform a service dump.
 
@@ -228,11 +335,9 @@ class FireTV:
         :param grep: Grep for this string.
         :returns: Dump, optionally grepped.
         """
-        if not self._adb:
-            return
         if grep:
-            return self._adb.Shell('dumpsys {0} | grep "{1}"'.format(service, grep))
-        return self._adb.Shell('dumpsys {0}'.format(service))
+            return self._adb_shell('dumpsys {0} | grep "{1}"'.format(service, grep))
+        return self._adb_shell('dumpsys {0}'.format(service))
 
     def _dump_has(self, service, grep, search):
         """ Check if a dump has particular content.
@@ -242,16 +347,19 @@ class FireTV:
         :param search: Check for this substring.
         :returns: Found or not.
         """
-        return self._dump(service, grep=grep).strip().find(search) > -1
+        dump_grep = self._dump(service, grep=grep)
+
+        if not dump_grep:
+            return False
+
+        return dump_grep.strip().find(search) > -1
 
     def _input(self, cmd):
         """ Send input to the device.
 
         :param cmd: Input command.
         """
-        if not self._adb:
-            return
-        self._adb.Shell('input {0}'.format(cmd))
+        self._adb_shell('input {0}'.format(cmd))
 
     def _key(self, key):
         """ Send a key event to device.
@@ -266,10 +374,10 @@ class FireTV:
         :param search: Check for this substring.
         :returns: List of matching fields
         """
-        if not self._adb:
+        if not self.available:
             return
         result = []
-        ps = self._adb.StreamingShell('ps')
+        ps = self._adb_streaming_shell('ps')
         try:
             for bad_line in ps:
                 # The splitting of the StreamingShell doesn't always work
@@ -284,15 +392,17 @@ class FireTV:
             raise IOError
 
     def _send_intent(self, pkg, intent, count=1):
-        if not self._adb:
-            return None
 
         cmd = 'monkey -p {} -c {} {}; echo $?'.format(pkg, intent, count)
         logging.debug("Sending an intent %s to %s (count: %s)", intent, pkg, count)
 
         # adb shell outputs in weird format, so we cut it into lines,
         # separate the retcode and return info to the user
-        res = self._adb.Shell(cmd).strip().split("\r\n")
+        res = self._adb_shell(cmd).strip()
+        if res is None:
+            return {}
+
+        res = res.split("\r\n")
         retcode = res[-1]
         output = "\n".join(res[:-1])
 
@@ -305,12 +415,12 @@ class FireTV:
     # ======================================================================= #
     def turn_on(self):
         """ Send power action if device is off. """
-        if self._adb and not self.screen_on:
+        if not self.screen_on:
             self.power()
 
     def turn_off(self):
         """ Send power action if device is not off. """
-        if self._adb and self.screen_on:
+        if self.screen_on:
             self.sleep()
 
     # ======================================================================= #

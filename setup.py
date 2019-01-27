@@ -9,7 +9,7 @@ setup(
     author='happyleaves',
     author_email='happyleaves.tfr@gmail.com',
     packages=['firetv'],
-    install_requires=['pycryptodome', 'rsa', 'adb-homeassistant'],
+    install_requires=['pycryptodome', 'rsa', 'adb-homeassistant', 'pure-python-adb-homeassistant'],
     extras_require={
         'firetv-server': ['Flask>=0.10.1', 'PyYAML>=3.12']
     },
