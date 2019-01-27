@@ -4,12 +4,6 @@
 
 ## Installation
 
-Install the following ADB dependencies via your package manager:
-
-with `apt-get`: `swig libssl-dev python-dev libusb-1.0-0`
-
-with `yum`: `swig openssl-devel python-devel libusbx-devel`
-
 Install the package using the command:
 
 `pip install firetv`
@@ -18,9 +12,10 @@ If you want the HTTP server component installed as a script, use:
 
 `pip install firetv[firetv-server]`
 
-Consider installing `adb` directly from the git repository. It contains bugfixes not in the pip-packaged version:
+**NOTE:** You may need to install the following ADB dependencies via your package manager:
 
-`pip install git+git://github.com/google/python-adb.git@master`
+* with `apt-get`: `swig libssl-dev python-dev libusb-1.0-0`
+* with `yum`: `swig openssl-devel python-devel libusbx-devel`
 
 ## Server
 
