@@ -74,7 +74,8 @@ def is_valid_app_id(app_id):
     """
     return valid_app_id.match(app_id)
 
-def add(device_id, host, adbkey=''):
+
+def add(device_id, host, adbkey='', adb_server_ip='', adb_server_port=5037):
     """ Add a device.
 
     Creates FireTV instance associated with device identifier.
@@ -82,11 +83,13 @@ def add(device_id, host, adbkey=''):
     :param device_id: Device identifier.
     :param host: Host in <address>:<port> format.
     :param adbkey: The path to the "adbkey" file
+    :param adb_server_ip: the IP address for the ADB server
+    :param adb_server_port: the port for the ADB server
     :returns: Added successfully or not.
     """
     valid = is_valid_device_id(device_id) and is_valid_host(host)
     if valid:
-        devices[device_id] = FireTV(str(host), str(adbkey))
+        devices[device_id] = FireTV(str(host), str(adbkey), str(adb_server_ip), str(adb_server_port))
     return valid
 
 
@@ -106,7 +109,7 @@ def add_device():
     req = request.get_json()
     success = False
     if 'device_id' in req and 'host' in req:
-        success = add(req['device_id'], req['host'], req.get('adbkey', ''))
+        success = add(req['device_id'], req['host'], req.get('adbkey', ''), req.get('adb_server_ip', ''), req.get('adb_server_port', 5037))
     return jsonify(success=success)
 
 
@@ -121,12 +124,14 @@ def list_devices():
         }
     return jsonify(devices=output)
 
+
 @app.route('/devices/state/<device_id>', methods=['GET'])
 def device_state(device_id):
     """ Get device state via HTTP GET. """
     if device_id not in devices:
         return jsonify(success=False)
     return jsonify(state=devices[device_id].state)
+
 
 @app.route('/devices/<device_id>/apps/current', methods=['GET'])
 def current_app(device_id):
@@ -142,6 +147,7 @@ def current_app(device_id):
 
     return jsonify(current_app=current)
 
+
 @app.route('/devices/<device_id>/apps/running', methods=['GET'])
 def running_apps(device_id):
     """ Get running apps via HTTP GET. """
@@ -150,6 +156,7 @@ def running_apps(device_id):
     if device_id not in devices:
         abort(404)
     return jsonify(running_apps=devices[device_id].running_apps)
+
 
 @app.route('/devices/<device_id>/apps/state/<app_id>', methods=['GET'])
 def get_app_state(device_id, app_id):
@@ -163,9 +170,11 @@ def get_app_state(device_id, app_id):
     app_state = devices[device_id].app_state(app_id)
     return jsonify(state=app_state, status=app_state)
 
+
 @app.route('/devices/<device_id>/apps/<app_id>/state', methods=['GET'])
 def get_app_state_alt(device_id, app_id):
     return get_app_state(device_id, app_id)
+
 
 @app.route('/devices/action/<device_id>/<action_id>', methods=['GET'])
 def device_action(device_id, action_id):
@@ -177,6 +186,7 @@ def device_action(device_id, action_id):
             input_cmd()
             success = True
     return jsonify(success=success)
+
 
 @app.route('/devices/<device_id>/apps/<app_id>/start', methods=['GET'])
 def app_start(device_id, app_id):
@@ -191,6 +201,7 @@ def app_start(device_id, app_id):
     success = devices[device_id].launch_app(app_id)
     return jsonify(success=success)
 
+
 @app.route('/devices/<device_id>/apps/<app_id>/stop', methods=['GET'])
 def app_stop(device_id, app_id):
     """ stops an app with corresponding package name"""
@@ -203,6 +214,7 @@ def app_stop(device_id, app_id):
 
     success = devices[device_id].stop_app(app_id)
     return jsonify(success=success)
+
 
 @app.route('/devices/connect/<device_id>', methods=['GET'])
 def device_connect(device_id):
@@ -221,6 +233,7 @@ def _parse_config(config_file_path):
     config_file.close()
     return config
 
+
 def _add_devices_from_config(args):
     """ Add devices from config. """
     config = _parse_config(args.config)
@@ -230,7 +243,9 @@ def _add_devices_from_config(args):
                 raise ValueError('devicename "default" in config is not allowed if default param is set')
             if config['devices'][device]['host'] == args.default:
                 raise ValueError('host set in default param must not be defined in config')
-        add(device, config['devices'][device]['host'], config['devices'][device].get('adbkey', ''))
+        add(device, config['devices'][device]['host'], config['devices'][device].get('adbkey', ''),
+            config['devices'][device].get('adb_server_ip', ''), config['devices'][device].get('adb_server_port', 5037))
+
 
 def main():
     """ Set up the server. """
