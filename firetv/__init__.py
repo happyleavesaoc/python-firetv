@@ -19,7 +19,7 @@ from adb_messenger.client import Client as AdbClient
 Signer = PythonRSASigner.FromRSAKeyPath
 
 # Matches window windows output for app & activity name gathering
-WINDOW_REGEX = re.compile("Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:\/(?P<activity>.+?))?\}$", re.MULTILINE)
+WINDOW_REGEX = re.compile(r"Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:\/(?P<activity>.+?))?\}$", re.MULTILINE)
 
 # ADB key event codes.
 HOME = 3
@@ -93,10 +93,10 @@ INTENT_HOME = "android.intent.category.HOME"
 
 
 class FireTV:
-    """ Represents an Amazon Fire TV device. """
+    """Represents an Amazon Fire TV device."""
 
     def __init__(self, host, adbkey='', adb_server_ip='', adb_server_port=5037):
-        """ Initialize FireTV object.
+        """Initialize FireTV object.
 
         :param host: Host in format <address>:port.
         :param adbkey: The path to the "adbkey" file
@@ -116,7 +116,7 @@ class FireTV:
         self._adb_client = None  # pure-python-adb
         self._adb_device = None  # pure-python-adb
 
-        # the method used for sending ADB commands
+        # the methods used for sending ADB commands
         if not self.adb_server_ip:
             # python-adb
             self._adb_shell = self._adb_shell_python_adb
@@ -129,11 +129,112 @@ class FireTV:
         # establish the ADB connection
         self.connect()
 
+    # ======================================================================= #
+    #                                                                         #
+    #                               ADB methods                               #
+    #                                                                         #
+    # ======================================================================= #
+    def _adb_shell_python_adb(self, cmd):
+        if not self.available:
+            return None
+        return self._adb.Shell(cmd)
+
+    def _adb_shell_pure_python_adb(self, cmd):
+        if not self._available:
+            return None
+        return self._adb_device.shell(cmd)
+
+    def _adb_streaming_shell_python_adb(self, cmd):
+        if not self.available:
+            return []
+        return self._adb.StreamingShell(cmd)
+
+    def _adb_streaming_shell_pure_python_adb(self, cmd):
+        if not self._available:
+            return None
+        # this is not yet implemented
+        return []
+
+    def _dump(self, service, grep=None):
+        """Perform a service dump.
+
+        :param service: Service to dump.
+        :param grep: Grep for this string.
+        :returns: Dump, optionally grepped.
+        """
+        if grep:
+            return self._adb_shell('dumpsys {0} | grep "{1}"'.format(service, grep))
+        return self._adb_shell('dumpsys {0}'.format(service))
+
+    def _dump_has(self, service, grep, search):
+        """Check if a dump has particular content.
+
+        :param service: Service to dump.
+        :param grep: Grep for this string.
+        :param search: Check for this substring.
+        :returns: Found or not.
+        """
+        dump_grep = self._dump(service, grep=grep)
+
+        if not dump_grep:
+            return False
+
+        return dump_grep.strip().find(search) > -1
+
+    def _key(self, key):
+        """Send a key event to device.
+
+        :param key: Key constant.
+        """
+        self._adb_shell('input keyevent {0}'.format(key))
+
+    def _ps(self, search=''):
+        """Perform a ps command with optional filtering.
+
+        :param search: Check for this substring.
+        :returns: List of matching fields
+        """
+        if not self.available:
+            return
+        result = []
+        ps = self._adb_streaming_shell('ps')
+        try:
+            for bad_line in ps:
+                # The splitting of the StreamingShell doesn't always work
+                # this is to ensure that we get only one line
+                for line in bad_line.splitlines():
+                    if search in line:
+                        result.append(line.strip().rsplit(' ', 1)[-1])
+            return result
+        except InvalidChecksumError as e:
+            print(e)
+            self.connect()
+            raise IOError
+
+    def _send_intent(self, pkg, intent, count=1):
+
+        cmd = 'monkey -p {} -c {} {}; echo $?'.format(pkg, intent, count)
+        logging.debug("Sending an intent %s to %s (count: %s)", intent, pkg, count)
+
+        # adb shell outputs in weird format, so we cut it into lines,
+        # separate the retcode and return info to the user
+        res = self._adb_shell(cmd)
+        if res is None:
+            return {}
+
+        res = res.strip().split("\r\n")
+        retcode = res[-1]
+        output = "\n".join(res[:-1])
+
+        return {"retcode": retcode, "output": output}
+
     def connect(self):
-        """ Connect to an Amazon Fire TV device.
+        """Connect to an Amazon Fire TV device.
 
         Will attempt to establish ADB connection to the given host.
         Failure sets state to UNKNOWN and disables sending actions.
+
+        :returns: True if successful, False otherwise
         """
         if not self.adb_server_ip:
             # python-adb
@@ -173,8 +274,13 @@ class FireTV:
             finally:
                 return self._available
 
+    # ======================================================================= #
+    #                                                                         #
+    #                              App methods                                #
+    #                                                                         #
+    # ======================================================================= #
     def app_state(self, app):
-        """ Informs if application is running """
+        """Informs if application is running."""
         if not self.available or not self.screen_on:
             return STATE_OFF
         if self.current_app["package"] == app:
@@ -182,9 +288,11 @@ class FireTV:
         return STATE_OFF
 
     def launch_app(self, app):
+        """Launch an app."""
         return self._send_intent(app, INTENT_LAUNCH)
 
     def stop_app(self, app):
+        """Stop an app (really, it just returns to the home screen)."""
         return self._send_intent(PACKAGE_LAUNCHER, INTENT_HOME)
 
     # ======================================================================= #
@@ -194,7 +302,7 @@ class FireTV:
     # ======================================================================= #
     @property
     def state(self):
-        """ Compute and return the device state.
+        """Compute and return the device state.
 
         :returns: Device state.
         """
@@ -218,7 +326,7 @@ class FireTV:
 
     @property
     def available(self):
-        """ Check whether the ADB connection is intact. """
+        """Check whether the ADB connection is intact."""
         if not self.adb_server_ip:
             # python-adb
             return bool(self._adb)
@@ -256,11 +364,12 @@ class FireTV:
 
     @property
     def running_apps(self):
-        """ Return an array of running user applications """
+        """Return an array of running user applications."""
         return self._ps('u0_a')
 
     @property
     def current_app(self):
+        """Return the current app."""
         current_focus = self._dump("window windows", "mCurrentFocus")
         if current_focus is None:
             return None
@@ -279,134 +388,28 @@ class FireTV:
 
     @property
     def screen_on(self):
-        """ Check if the screen is on. """
+        """Check if the screen is on."""
         return self._dump_has('power', 'Display Power', 'state=ON')
 
     @property
     def awake(self):
-        """ Check if the device is awake (screen saver is not running). """
+        """Check if the device is awake (screensaver is not running)."""
         return self._dump_has('power', 'mWakefulness', 'Awake')
 
     @property
     def wake_lock(self):
-        """ Check for wake locks (device is playing). """
+        """Check for wake locks (device is playing)."""
         return not self._dump_has('power', 'Locks', 'size=0')
 
     @property
     def launcher(self):
-        """ Check if the active application is the Amazon TV launcher. """
+        """Check if the active application is the Amazon TV launcher."""
         return self.current_app["package"] == PACKAGE_LAUNCHER
 
     @property
     def settings(self):
-        """ Check if the active application is the Amazon menu. """
+        """Check if the active application is the Amazon menu."""
         return self.current_app["package"] == PACKAGE_SETTINGS
-
-    # ======================================================================= #
-    #                                                                         #
-    #                               ADB methods                               #
-    #                                                                         #
-    # ======================================================================= #
-    def _adb_shell_python_adb(self, cmd):
-        if not self.available:
-            return None
-        return self._adb.Shell(cmd)
-
-    def _adb_shell_pure_python_adb(self, cmd):
-        if not self._available:
-            return None
-        return self._adb_device.shell(cmd)
-
-    def _adb_streaming_shell_python_adb(self, cmd):
-        if not self.available:
-            return []
-        return self._adb.StreamingShell(cmd)
-
-    def _adb_streaming_shell_pure_python_adb(self, cmd):
-        if not self._available:
-            return None
-        # this is not yet implemented
-        return []
-
-    def _dump(self, service, grep=None):
-        """ Perform a service dump.
-
-        :param service: Service to dump.
-        :param grep: Grep for this string.
-        :returns: Dump, optionally grepped.
-        """
-        if grep:
-            return self._adb_shell('dumpsys {0} | grep "{1}"'.format(service, grep))
-        return self._adb_shell('dumpsys {0}'.format(service))
-
-    def _dump_has(self, service, grep, search):
-        """ Check if a dump has particular content.
-
-        :param service: Service to dump.
-        :param grep: Grep for this string.
-        :param search: Check for this substring.
-        :returns: Found or not.
-        """
-        dump_grep = self._dump(service, grep=grep)
-
-        if not dump_grep:
-            return False
-
-        return dump_grep.strip().find(search) > -1
-
-    def _input(self, cmd):
-        """ Send input to the device.
-
-        :param cmd: Input command.
-        """
-        self._adb_shell('input {0}'.format(cmd))
-
-    def _key(self, key):
-        """ Send a key event to device.
-
-        :param key: Key constant.
-        """
-        self._input('keyevent {0}'.format(key))
-
-    def _ps(self, search=''):
-        """ Perform a ps command with optional filtering.
-
-        :param search: Check for this substring.
-        :returns: List of matching fields
-        """
-        if not self.available:
-            return
-        result = []
-        ps = self._adb_streaming_shell('ps')
-        try:
-            for bad_line in ps:
-                # The splitting of the StreamingShell doesn't always work
-                # this is to ensure that we get only one line
-                for line in bad_line.splitlines():
-                    if search in line:
-                        result.append(line.strip().rsplit(' ',1)[-1])
-            return result
-        except InvalidChecksumError as e:
-            print(e)
-            self.connect()
-            raise IOError
-
-    def _send_intent(self, pkg, intent, count=1):
-
-        cmd = 'monkey -p {} -c {} {}; echo $?'.format(pkg, intent, count)
-        logging.debug("Sending an intent %s to %s (count: %s)", intent, pkg, count)
-
-        # adb shell outputs in weird format, so we cut it into lines,
-        # separate the retcode and return info to the user
-        res = self._adb_shell(cmd).strip()
-        if res is None:
-            return {}
-
-        res = res.split("\r\n")
-        retcode = res[-1]
-        output = "\n".join(res[:-1])
-
-        return {"retcode": retcode, "output": output}
 
     # ======================================================================= #
     #                                                                         #
@@ -414,12 +417,12 @@ class FireTV:
     #                                                                         #
     # ======================================================================= #
     def turn_on(self):
-        """ Send power action if device is off. """
+        """Send power action if device is off."""
         if not self.screen_on:
             self.power()
 
     def turn_off(self):
-        """ Send power action if device is not off. """
+        """Send power action if device is not off."""
         if self.screen_on:
             self.sleep()
 
@@ -429,55 +432,55 @@ class FireTV:
     #                                                                         #
     # ======================================================================= #
     def power(self):
-        """ Send power action. """
+        """Send power action."""
         self._key(POWER)
 
     def sleep(self):
-        """ Send sleep action. """
+        """Send sleep action."""
         self._key(SLEEP)
 
     def home(self):
-        """ Send home action. """
+        """Send home action."""
         self._key(HOME)
 
     def up(self):
-        """ Send up action. """
+        """Send up action."""
         self._key(UP)
 
     def down(self):
-        """ Send down action. """
+        """Send down action."""
         self._key(DOWN)
 
     def left(self):
-        """ Send left action. """
+        """Send left action."""
         self._key(LEFT)
 
     def right(self):
-        """ Send right action. """
+        """Send right action."""
         self._key(RIGHT)
 
     def enter(self):
-        """ Send enter action. """
+        """Send enter action."""
         self._key(ENTER)
 
     def back(self):
-        """ Send back action. """
+        """Send back action."""
         self._key(BACK)
 
     def space(self):
-        """ Send space keypress. """
+        """Send space keypress."""
         self._key(SPACE)
 
     def menu(self):
-        """ Send menu action. """
+        """Send menu action."""
         self._key(MENU)
 
     def volume_up(self):
-        """ Send volume up action. """
+        """Send volume up action."""
         self._key(VOLUME_UP)
 
     def volume_down(self):
-        """ Send volume down action. """
+        """Send volume down action."""
         self._key(VOLUME_DOWN)
 
     # ======================================================================= #
@@ -486,23 +489,23 @@ class FireTV:
     #                                                                         #
     # ======================================================================= #
     def media_play_pause(self):
-        """ Send media play/pause action. """
+        """Send media play/pause action."""
         self._key(PLAY_PAUSE)
 
     def media_play(self):
-        """ Send media play action. """
+        """Send media play action."""
         self._key(PLAY)
 
     def media_pause(self):
-        """ Send media pause action. """
+        """Send media pause action."""
         self._key(PAUSE)
 
     def media_next(self):
-        """ Send media next action (results in fast-forward). """
+        """Send media next action (results in fast-forward)."""
         self._key(NEXT)
 
     def media_previous(self):
-        """ Send media previous action (results in rewind). """
+        """Send media previous action (results in rewind)."""
         self._key(PREVIOUS)
 
     # ======================================================================= #
@@ -511,145 +514,145 @@ class FireTV:
     #                                                                         #
     # ======================================================================= #
     def key_0(self):
-        """ Send 0 keypress. """
+        """Send 0 keypress."""
         self._key(KEY_0)
 
     def key_1(self):
-        """ Send 1 keypress. """
+        """Send 1 keypress."""
         self._key(KEY_1)
 
     def key_2(self):
-        """ Send 2 keypress. """
+        """Send 2 keypress."""
         self._key(KEY_2)
 
     def key_3(self):
-        """ Send 3 keypress. """
+        """Send 3 keypress."""
         self._key(KEY_3)
 
     def key_4(self):
-        """ Send 4 keypress. """
+        """Send 4 keypress."""
         self._key(KEY_4)
 
     def key_5(self):
-        """ Send 5 keypress. """
+        """Send 5 keypress."""
         self._key(KEY_5)
 
     def key_6(self):
-        """ Send 6 keypress. """
+        """Send 6 keypress."""
         self._key(KEY_6)
 
     def key_7(self):
-        """ Send 7 keypress. """
+        """Send 7 keypress."""
         self._key(KEY_7)
 
     def key_8(self):
-        """ Send 8 keypress. """
+        """Send 8 keypress."""
         self._key(KEY_8)
 
     def key_9(self):
-        """ Send 9 keypress. """
+        """Send 9 keypress."""
         self._key(KEY_9)
 
     def key_a(self):
-        """ Send a keypress. """
+        """Send a keypress."""
         self._key(KEY_A)
 
     def key_b(self):
-        """ Send b keypress. """
+        """Send b keypress."""
         self._key(KEY_B)
 
     def key_c(self):
-        """ Send c keypress. """
+        """Send c keypress."""
         self._key(KEY_C)
 
     def key_d(self):
-        """ Send d keypress. """
+        """Send d keypress."""
         self._key(KEY_D)
 
     def key_e(self):
-        """ Send e keypress. """
+        """Send e keypress."""
         self._key(KEY_E)
 
     def key_f(self):
-        """ Send f keypress. """
+        """Send f keypress."""
         self._key(KEY_F)
 
     def key_g(self):
-        """ Send g keypress. """
+        """Send g keypress."""
         self._key(KEY_G)
 
     def key_h(self):
-        """ Send h keypress. """
+        """Send h keypress."""
         self._key(KEY_H)
 
     def key_i(self):
-        """ Send i keypress. """
+        """Send i keypress."""
         self._key(KEY_I)
 
     def key_j(self):
-        """ Send j keypress. """
+        """Send j keypress."""
         self._key(KEY_J)
 
     def key_k(self):
-        """ Send k keypress. """
+        """Send k keypress."""
         self._key(KEY_K)
 
     def key_l(self):
-        """ Send l keypress. """
+        """Send l keypress."""
         self._key(KEY_L)
 
     def key_m(self):
-        """ Send m keypress. """
+        """Send m keypress."""
         self._key(KEY_M)
 
     def key_n(self):
-        """ Send n keypress. """
+        """Send n keypress."""
         self._key(KEY_N)
 
     def key_o(self):
-        """ Send o keypress. """
+        """Send o keypress."""
         self._key(KEY_O)
 
     def key_p(self):
-        """ Send p keypress. """
+        """Send p keypress."""
         self._key(KEY_P)
 
     def key_q(self):
-        """ Send q keypress. """
+        """Send q keypress."""
         self._key(KEY_Q)
 
     def key_r(self):
-        """ Send r keypress. """
+        """Send r keypress."""
         self._key(KEY_R)
 
     def key_s(self):
-        """ Send s keypress. """
+        """Send s keypress."""
         self._key(KEY_S)
 
     def key_t(self):
-        """ Send t keypress. """
+        """Send t keypress."""
         self._key(KEY_T)
 
     def key_u(self):
-        """ Send u keypress. """
+        """Send u keypress."""
         self._key(KEY_U)
 
     def key_v(self):
-        """ Send v keypress. """
+        """Send v keypress."""
         self._key(KEY_V)
 
     def key_w(self):
-        """ Send w keypress. """
+        """Send w keypress."""
         self._key(KEY_W)
 
     def key_x(self):
-        """ Send x keypress. """
+        """Send x keypress."""
         self._key(KEY_X)
 
     def key_y(self):
-        """ Send y keypress. """
+        """Send y keypress."""
         self._key(KEY_Y)
 
     def key_z(self):
-        """ Send z keypress. """
+        """Send z keypress."""
         self._key(KEY_Z)
