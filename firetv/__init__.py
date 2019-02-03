@@ -21,6 +21,15 @@ Signer = PythonRSASigner.FromRSAKeyPath
 # Matches window windows output for app & activity name gathering
 WINDOW_REGEX = re.compile(r"Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:\/(?P<activity>.+?))?\}$", re.MULTILINE)
 
+# ADB shell commands for getting the `screen_on`, `awake`, `wake_lock`, and `current_app` properties
+SCREEN_ON_CMD = r"dumpsys power | grep 'Display Power' | grep -q 'state=ON'"
+AWAKE_CMD = r"dumpsys power | grep mWakefulness | grep -q Awake"
+WAKE_LOCK_CMD = r"dumpsys power | grep Locks | grep -q 'size=0'"
+CURRENT_APP_CMD = "dumpsys window windows | grep mCurrentFocus"
+
+# echo '1' if the previous shell command was successful, echo '0' if it was not
+SUCCESS1_FAILURE0 = r" && echo -e '1\c' || echo -e '0\c' "
+
 # ADB key event codes.
 HOME = 3
 VOLUME_UP = 24
@@ -389,17 +398,17 @@ class FireTV:
     @property
     def screen_on(self):
         """Check if the screen is on."""
-        return self._dump_has('power', 'Display Power', 'state=ON')
+        return self.adb_shell(SCREEN_ON_CMD + SUCCESS1_FAILURE0) == '1'
 
     @property
     def awake(self):
         """Check if the device is awake (screensaver is not running)."""
-        return self._dump_has('power', 'mWakefulness', 'Awake')
+        return self.adb_shell(AWAKE_CMD + SUCCESS1_FAILURE0) == '1'
 
     @property
     def wake_lock(self):
         """Check for wake locks (device is playing)."""
-        return not self._dump_has('power', 'Locks', 'size=0')
+        return self.adb_shell(WAKE_LOCK_CMD + SUCCESS1_FAILURE0) == '1'
 
     @property
     def launcher(self):
@@ -411,6 +420,34 @@ class FireTV:
         """Check if the active application is the Amazon menu."""
         return self.current_app["package"] == PACKAGE_SETTINGS
 
+    def get_properties(self):
+        """Get the ``screen_on``, ``awake``, ``wake_lock``, and ``current_app`` properties."""
+        output = self.adb_shell(SCREEN_ON_CMD + SUCCESS1_FAILURE0 + " && " +
+                                AWAKE_CMD + SUCCESS1_FAILURE0 + " && " +
+                                WAKE_LOCK_CMD + SUCCESS1_FAILURE0 + " &&" +
+                                CURRENT_APP_CMD)
+
+        if not output:
+            return None, None, None, None
+
+        screen_on = output[0] == '1'
+        awake = output[1] == '1'
+        wake_lock = output[2] == '1'
+
+        if len(output) < 4:
+            return screen_on, awake, wake_lock, None
+
+        current_focus = output[3:].replace("\r", "")
+        matches = WINDOW_REGEX.search(current_focus)
+
+        # case 1: current app was successfully found
+        if matches:
+            (pkg, activity) = matches.group("package", "activity")
+            return screen_on, awake, wake_lock, {"package": pkg, "activity": activity}
+
+        # case 2: current app was not found
+        return screen_on, awake, wake_lock, None
+
     # ======================================================================= #
     #                                                                         #
     #                           turn on/off methods                           #
@@ -418,13 +455,11 @@ class FireTV:
     # ======================================================================= #
     def turn_on(self):
         """Send power action if device is off."""
-        if not self.screen_on:
-            self.power()
+        self.adb_shell(SCREEN_ON_CMD + " || (input keyevent {0} && input keyevent {1})".format(POWER, HOME))
 
     def turn_off(self):
         """Send power action if device is not off."""
-        if self.screen_on:
-            self.sleep()
+        self.adb_shell(SCREEN_ON_CMD + " && input keyevent {0}".format(SLEEP))
 
     # ======================================================================= #
     #                                                                         #
