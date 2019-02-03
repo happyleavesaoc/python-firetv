@@ -9,6 +9,8 @@ ADB Debugging must be enabled.
 import logging
 import re
 from socket import error as socket_error
+import sys
+import threading
 
 from adb import adb_commands
 from adb.sign_pythonrsa import PythonRSASigner
@@ -17,6 +19,11 @@ from adb_messenger.client import Client as AdbClient
 
 
 Signer = PythonRSASigner.FromRSAKeyPath
+
+if sys.version_info[0] > 2 and sys.version_info[1] > 1:
+    LOCK_KWARGS = {'timeout': 3}
+else:
+    LOCK_KWARGS = {}
 
 # Matches window windows output for app & activity name gathering
 WINDOW_REGEX = re.compile(r"Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:\/(?P<activity>.+?))?\}$", re.MULTILINE)
@@ -120,6 +127,9 @@ class FireTV:
         # keep track of whether the ADB connection is intact
         self._available = False
 
+        # use a lock to make sure that ADB commands don't overlap
+        self._adb_lock = threading.Lock()
+
         # the attributes used for sending ADB commands; filled in in `self.connect()`
         self._adb = None  # python-adb
         self._adb_client = None  # pure-python-adb
@@ -146,23 +156,43 @@ class FireTV:
     def _adb_shell_python_adb(self, cmd):
         if not self.available:
             return None
-        return self._adb.Shell(cmd)
+
+        if self._adb_lock.acquire(**LOCK_KWARGS):
+            try:
+                return self._adb.Shell(cmd)
+            finally:
+                self._adb_lock.release()
 
     def _adb_shell_pure_python_adb(self, cmd):
         if not self._available:
             return None
-        return self._adb_device.shell(cmd)
+
+        if self._adb_lock.acquire(**LOCK_KWARGS):
+            try:
+                return self._adb_device.shell(cmd)
+            finally:
+                self._adb_lock.release()
 
     def _adb_streaming_shell_python_adb(self, cmd):
         if not self.available:
             return []
-        return self._adb.StreamingShell(cmd)
+
+        if self._adb_lock.acquire(**LOCK_KWARGS):
+            try:
+                return self._adb.StreamingShell(cmd)
+            finally:
+                self._adb_lock.release()
 
     def _adb_streaming_shell_pure_python_adb(self, cmd):
         if not self._available:
             return None
+
         # this is not yet implemented
-        return []
+        if self._adb_lock.acquire(**LOCK_KWARGS):
+            try:
+                return []
+            finally:
+                self._adb_lock.release()
 
     def _dump(self, service, grep=None):
         """Perform a service dump.
@@ -245,43 +275,48 @@ class FireTV:
 
         :returns: True if successful, False otherwise
         """
-        if not self.adb_server_ip:
-            # python-adb
-            try:
-                if self.adbkey:
-                    signer = Signer(self.adbkey)
+        self._adb_lock.acquire(**LOCK_KWARGS)
+        try:
+            if not self.adb_server_ip:
+                # python-adb
+                try:
+                    if self.adbkey:
+                        signer = Signer(self.adbkey)
 
-                    # Connect to the device
-                    self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer], default_timeout_ms=9000)
-                else:
-                    self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, default_timeout_ms=9000)
+                        # Connect to the device
+                        self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer], default_timeout_ms=9000)
+                    else:
+                        self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, default_timeout_ms=9000)
 
-                # ADB connection successfully established
-                self._available = True
+                    # ADB connection successfully established
+                    self._available = True
 
-            except socket_error as serr:
-                self._adb = None
-                if self._available:
+                except socket_error as serr:
+                    self._adb = None
+                    if self._available:
+                        self._available = False
+                        if serr.strerror is None:
+                            serr.strerror = "Timed out trying to connect to ADB device."
+                        logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
+
+                finally:
+                    return self._available
+
+            else:
+                # pure-python-adb
+                try:
+                    self._adb_client = AdbClient(host=self.adb_server_ip, port=self.adb_server_port)
+                    self._adb_device = self._adb_client.device(self.host)
+                    self._available = bool(self._adb_device)
+
+                except:
                     self._available = False
-                    if serr.strerror is None:
-                        serr.strerror = "Timed out trying to connect to ADB device."
-                    logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
 
-            finally:
-                return self._available
+                finally:
+                    return self._available
 
-        else:
-            # pure-python-adb
-            try:
-                self._adb_client = AdbClient(host=self.adb_server_ip, port=self.adb_server_port)
-                self._adb_device = self._adb_client.device(self.host)
-                self._available = bool(self._adb_device)
-
-            except:
-                self._available = False
-
-            finally:
-                return self._available
+        finally:
+            self._adb_lock.release()
 
     # ======================================================================= #
     #                                                                         #
