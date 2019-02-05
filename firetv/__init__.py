@@ -420,8 +420,11 @@ class FireTV:
 
     @property
     def running_apps(self):
-        """Return an array of running user applications."""
-        return self._ps('u0_a')
+        """Return a list of running user applications."""
+        ps = self.adb_shell("ps | grep u0_a")
+        if ps:
+            return [line.strip().rsplit(' ', 1)[-1] for line in ps.splitlines() if line.strip()]  
+        return []
 
     @property
     def current_app(self):
