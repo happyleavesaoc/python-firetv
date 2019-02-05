@@ -93,6 +93,18 @@ KEY_X = 52
 KEY_Y = 53
 KEY_Z = 54
 
+# Select key codes for use by a Home Assistant service.
+KEYS = {'POWER': POWER,
+        'SLEEP': SLEEP,
+        'HOME': HOME,
+        'ENTER': ENTER,
+        'BACK': BACK,
+        'MENU': MENU,
+        'UP': UP,
+        'DOWN': DOWN,
+        'LEFT': LEFT,
+        'RIGHT': RIGHT}
+
 # Fire TV states.
 STATE_ON = 'on'
 STATE_IDLE = 'idle'
