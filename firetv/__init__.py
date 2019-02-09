@@ -332,6 +332,62 @@ class FireTV:
 
     # ======================================================================= #
     #                                                                         #
+    #                          Home Assistant Update                          #
+    #                                                                         #
+    # ======================================================================= #
+    def update(self, get_running_apps=True):
+        """Get the state of the device, the current app, and the running apps.
+
+        :param get_running_apps: whether or not to get the ``running_apps`` property
+        :return state: the state of the device
+        :return current_app: the current app
+        :return running_apps: the running apps
+        """
+        # The `screen_on`, `awake`, `wake_lock`, and `current_app` properties.
+        screen_on, awake, wake_lock, _current_app = self.get_properties()
+
+        # Check if device is off.
+        if not screen_on:
+            state = STATE_OFF
+            current_app = None
+            running_apps = None
+
+        # Check if screen saver is on.
+        elif not awake:
+            state = STATE_IDLE
+            current_app = None
+            running_apps = None
+
+        else:
+            # Get the current app.
+            if isinstance(_current_app, dict) and 'package' in _current_app:
+                current_app = _current_app['package']
+            else:
+                current_app = None
+
+            # Get the running apps.
+            if get_running_apps:
+                running_apps = self.running_apps
+            else:
+                running_apps = [current_app]
+
+            # Get the state.
+            # TODO: determine the state differently based on the `current_app`.
+            if current_app in [PACKAGE_LAUNCHER, PACKAGE_SETTINGS]:
+                state = STATE_STANDBY
+
+            # Check for a wake lock (device is playing).
+            elif wake_lock:
+                state = STATE_PLAYING
+
+            # Otherwise, device is paused.
+            else:
+                state = STATE_PAUSED
+
+        return state, current_app, running_apps
+
+    # ======================================================================= #
+    #                                                                         #
     #                              App methods                                #
     #                                                                         #
     # ======================================================================= #
@@ -423,7 +479,7 @@ class FireTV:
         """Return a list of running user applications."""
         ps = self.adb_shell("ps | grep u0_a")
         if ps:
-            return [line.strip().rsplit(' ', 1)[-1] for line in ps.splitlines() if line.strip()]  
+            return [line.strip().rsplit(' ', 1)[-1] for line in ps.splitlines() if line.strip()]
         return []
 
     @property
