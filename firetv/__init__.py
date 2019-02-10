@@ -33,7 +33,7 @@ WINDOW_REGEX = re.compile(r"Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:
 SCREEN_ON_CMD = r"dumpsys power | grep 'Display Power' | grep -q 'state=ON'"
 AWAKE_CMD = r"dumpsys power | grep mWakefulness | grep -q Awake"
 WAKE_LOCK_CMD = r"dumpsys power | grep Locks | grep -q 'size=0'"
-AUDIO_STATE_CMD = r"dumpsys audio | grep paused && echo -e '1\c' || (dumpsys audio | grep started && echo '2\c' || echo '0\c')"
+AUDIO_STATE_CMD = r"dumpsys audio | grep -q paused && echo -e '1\c' || (dumpsys audio | grep -q started && echo '2\c' || echo '0\c')"
 CURRENT_APP_CMD = "dumpsys window windows | grep mCurrentFocus"
 RUNNING_APPS_CMD = "ps | grep u0_a"
 
