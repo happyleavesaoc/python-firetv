@@ -548,8 +548,7 @@ class FireTV:
         output = self.adb_shell(SCREEN_ON_CMD + SUCCESS1_FAILURE0 + " && " +
                                 AWAKE_CMD + SUCCESS1_FAILURE0 + " && " +
                                 WAKE_LOCK_CMD + SUCCESS1_FAILURE0 + " &&" +
-                                AUDIO_PAUSED_CMD + SUCCESS1_FAILURE0 + " &&" +
-                                AUDIO_STARTED_CMD + SUCCESS1_FAILURE0 + " &&" +
+                                AUDIO_STATE_CMD + " &&" +
                                 CURRENT_APP_CMD)
 
         if not output:
