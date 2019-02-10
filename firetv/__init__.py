@@ -33,6 +33,8 @@ SCREEN_ON_CMD = r"dumpsys power | grep 'Display Power' | grep -q 'state=ON'"
 AWAKE_CMD = r"dumpsys power | grep mWakefulness | grep -q Awake"
 WAKE_LOCK_CMD = r"dumpsys power | grep Locks | grep -q 'size=0'"
 CURRENT_APP_CMD = "dumpsys window windows | grep mCurrentFocus"
+AUDIO_STARTED_CMD = "dumpsys audio | grep started"
+AUDIO_PAUSED_CMD = "dumpsys audio | grep paused"
 
 # echo '1' if the previous shell command was successful, echo '0' if it was not
 SUCCESS1_FAILURE0 = r" && echo -e '1\c' || echo -e '0\c' "
@@ -343,8 +345,8 @@ class FireTV:
         :return current_app: the current app
         :return running_apps: the running apps
         """
-        # The `screen_on`, `awake`, `wake_lock`, and `current_app` properties.
-        screen_on, awake, wake_lock, _current_app = self.get_properties()
+        # The `screen_on`, `awake`, `wake_lock`, `audio_state`, and `current_app` properties.
+        screen_on, awake, wake_lock, audio_state, _current_app = self.get_properties()
 
         # Check if device is off.
         if not screen_on:
@@ -519,6 +521,19 @@ class FireTV:
         return self.adb_shell(WAKE_LOCK_CMD + SUCCESS1_FAILURE0) == '1'
 
     @property
+    def audio_state(self):
+        """Check if audio is playing, paused, or off."""
+        output = self.adb_shell(AUDIO_PAUSED_CMD + SUCCESS1_FAILURE0 + " && " +
+                                AUDIO_STARTED_CMD + SUCCESS1_FAILURE0)
+        if output is None:
+            return None
+        if output[0] == '1':
+            return STATE_PAUSED
+        if output[1] == '1':
+            return STATE_PLAYING
+        return STATE_OFF
+
+    @property
     def launcher(self):
         """Check if the active application is the Amazon TV launcher."""
         return self.current_app["package"] == PACKAGE_LAUNCHER
@@ -529,32 +544,41 @@ class FireTV:
         return self.current_app["package"] == PACKAGE_SETTINGS
 
     def get_properties(self):
-        """Get the ``screen_on``, ``awake``, ``wake_lock``, and ``current_app`` properties."""
+        """Get the ``screen_on``, ``awake``, ``wake_lock``, ``audio_state``, and ``current_app`` properties."""
         output = self.adb_shell(SCREEN_ON_CMD + SUCCESS1_FAILURE0 + " && " +
                                 AWAKE_CMD + SUCCESS1_FAILURE0 + " && " +
                                 WAKE_LOCK_CMD + SUCCESS1_FAILURE0 + " &&" +
+                                AUDIO_PAUSED_CMD + SUCCESS1_FAILURE0 + " &&" +
+                                AUDIO_STARTED_CMD + SUCCESS1_FAILURE0 + " &&" +
                                 CURRENT_APP_CMD)
 
         if not output:
-            return None, None, None, None
+            return None, None, None, None, None
 
         screen_on = output[0] == '1'
         awake = output[1] == '1'
         wake_lock = output[2] == '1'
 
-        if len(output) < 4:
+        if output[3] == '1':
+            audio_state = STATE_PAUSED
+        elif output[4] == '1':
+            audio_state = STATE_PLAYING
+        else:
+            audio_state = STATE_OFF
+
+        if len(output) < 6:
             return screen_on, awake, wake_lock, None
 
-        current_focus = output[3:].replace("\r", "")
+        current_focus = output[5:].replace("\r", "")
         matches = WINDOW_REGEX.search(current_focus)
 
         # case 1: current app was successfully found
         if matches:
             (pkg, activity) = matches.group("package", "activity")
-            return screen_on, awake, wake_lock, {"package": pkg, "activity": activity}
+            return screen_on, awake, wake_lock, audio_state, {"package": pkg, "activity": activity}
 
         # case 2: current app was not found
-        return screen_on, awake, wake_lock, None
+        return screen_on, awake, wake_lock, audio_state, None
 
     # ======================================================================= #
     #                                                                         #
