@@ -28,13 +28,15 @@ else:
 # Matches window windows output for app & activity name gathering
 WINDOW_REGEX = re.compile(r"Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:\/(?P<activity>.+?))?\}$", re.MULTILINE)
 
-# ADB shell commands for getting the `screen_on`, `awake`, `wake_lock`, `audio_state`, and `current_app` properties
+# ADB shell commands for getting the `screen_on`, `awake`, `wake_lock`,
+# `audio_state`, `current_app`, and `running_apps` properties
 SCREEN_ON_CMD = r"dumpsys power | grep 'Display Power' | grep -q 'state=ON'"
 AWAKE_CMD = r"dumpsys power | grep mWakefulness | grep -q Awake"
 WAKE_LOCK_CMD = r"dumpsys power | grep Locks | grep -q 'size=0'"
 AUDIO_STARTED_CMD = "dumpsys audio | grep started"
 AUDIO_PAUSED_CMD = "dumpsys audio | grep paused"
 CURRENT_APP_CMD = "dumpsys window windows | grep mCurrentFocus"
+RUNNING_APPS_CMD = "ps | grep u0_a"
 
 # echo '1' if the previous shell command was successful, echo '0' if it was not
 SUCCESS1_FAILURE0 = r" && echo -e '1\c' || echo -e '0\c' "
@@ -481,7 +483,7 @@ class FireTV:
     @property
     def running_apps(self):
         """Return a list of running user applications."""
-        ps = self.adb_shell("ps | grep u0_a")
+        ps = self.adb_shell(RUNNING_APPS_CMD)
         if ps:
             return [line.strip().rsplit(' ', 1)[-1] for line in ps.splitlines() if line.strip()]
         return []
@@ -489,7 +491,7 @@ class FireTV:
     @property
     def current_app(self):
         """Return the current app."""
-        current_focus = self._dump("window windows", "mCurrentFocus")
+        current_focus = self.adb_shell(CURRENT_APP_CMD)
         if current_focus is None:
             return None
 
