@@ -28,13 +28,13 @@ else:
 # Matches window windows output for app & activity name gathering
 WINDOW_REGEX = re.compile(r"Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:\/(?P<activity>.+?))?\}$", re.MULTILINE)
 
-# ADB shell commands for getting the `screen_on`, `awake`, `wake_lock`, and `current_app` properties
+# ADB shell commands for getting the `screen_on`, `awake`, `wake_lock`, `audio_state`, and `current_app` properties
 SCREEN_ON_CMD = r"dumpsys power | grep 'Display Power' | grep -q 'state=ON'"
 AWAKE_CMD = r"dumpsys power | grep mWakefulness | grep -q Awake"
 WAKE_LOCK_CMD = r"dumpsys power | grep Locks | grep -q 'size=0'"
-CURRENT_APP_CMD = "dumpsys window windows | grep mCurrentFocus"
 AUDIO_STARTED_CMD = "dumpsys audio | grep started"
 AUDIO_PAUSED_CMD = "dumpsys audio | grep paused"
+CURRENT_APP_CMD = "dumpsys window windows | grep mCurrentFocus"
 
 # echo '1' if the previous shell command was successful, echo '0' if it was not
 SUCCESS1_FAILURE0 = r" && echo -e '1\c' || echo -e '0\c' "
@@ -522,7 +522,7 @@ class FireTV:
 
     @property
     def audio_state(self):
-        """Check if audio is playing, paused, or off."""
+        """Check if audio is playing, paused, or idle."""
         output = self.adb_shell(AUDIO_PAUSED_CMD + SUCCESS1_FAILURE0 + " && " +
                                 AUDIO_STARTED_CMD + SUCCESS1_FAILURE0)
         if output is None:
@@ -531,7 +531,7 @@ class FireTV:
             return STATE_PAUSED
         if output[1] == '1':
             return STATE_PLAYING
-        return STATE_OFF
+        return STATE_IDLE
 
     @property
     def launcher(self):
@@ -564,7 +564,7 @@ class FireTV:
         elif output[4] == '1':
             audio_state = STATE_PLAYING
         else:
-            audio_state = STATE_OFF
+            audio_state = STATE_IDLE
 
         if len(output) < 6:
             return screen_on, awake, wake_lock, None
