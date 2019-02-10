@@ -33,8 +33,7 @@ WINDOW_REGEX = re.compile(r"Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:
 SCREEN_ON_CMD = r"dumpsys power | grep 'Display Power' | grep -q 'state=ON'"
 AWAKE_CMD = r"dumpsys power | grep mWakefulness | grep -q Awake"
 WAKE_LOCK_CMD = r"dumpsys power | grep Locks | grep -q 'size=0'"
-AUDIO_STARTED_CMD = "dumpsys audio | grep started"
-AUDIO_PAUSED_CMD = "dumpsys audio | grep paused"
+AUDIO_STATE_CMD = r"dumpsys audio | grep paused && echo -e '1\c' || (dumpsys audio | grep started && echo '2\c' || echo '0\c')"
 CURRENT_APP_CMD = "dumpsys window windows | grep mCurrentFocus"
 RUNNING_APPS_CMD = "ps | grep u0_a"
 
@@ -525,13 +524,12 @@ class FireTV:
     @property
     def audio_state(self):
         """Check if audio is playing, paused, or idle."""
-        output = self.adb_shell(AUDIO_PAUSED_CMD + SUCCESS1_FAILURE0 + " && " +
-                                AUDIO_STARTED_CMD + SUCCESS1_FAILURE0)
+        output = self.adb_shell(AUDIO_STATE_CMD)
         if output is None:
             return None
-        if output[0] == '1':
+        if output == '1':
             return STATE_PAUSED
-        if output[1] == '1':
+        if output == '2':
             return STATE_PLAYING
         return STATE_IDLE
 
@@ -563,15 +561,15 @@ class FireTV:
 
         if output[3] == '1':
             audio_state = STATE_PAUSED
-        elif output[4] == '1':
+        elif output[3] == '2':
             audio_state = STATE_PLAYING
         else:
             audio_state = STATE_IDLE
 
-        if len(output) < 6:
-            return screen_on, awake, wake_lock, None
+        if len(output) < 5:
+            return screen_on, awake, wake_lock, audio_state, None
 
-        current_focus = output[5:].replace("\r", "")
+        current_focus = output[4:].replace("\r", "")
         matches = WINDOW_REGEX.search(current_focus)
 
         # case 1: current app was successfully found
