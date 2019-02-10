@@ -368,8 +368,10 @@ class FireTV:
             # Get the running apps.
             if get_running_apps:
                 running_apps = self.running_apps
-            else:
+            elif current_app:
                 running_apps = [current_app]
+            else:
+                running_apps = None
 
             # Get the state.
             # TODO: determine the state differently based on the `current_app`.
