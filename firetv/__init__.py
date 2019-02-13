@@ -574,21 +574,24 @@ class FireTV:
         wake_lock_size = int(lines[0].split("=")[1].strip())
 
         # `current_app` property
-        matches = WINDOW_REGEX.search(lines[0])
+        if len(lines) < 2:
+            return screen_on, awake, wake_lock_size, None, None
+
+        matches = WINDOW_REGEX.search(lines[1])
         if matches:
             # case 1: current app was successfully found
             (pkg, activity) = matches.group("package", "activity")
             current_app = {"package": pkg, "activity": activity}
         else:
             # case 2: current app could not be found
-            logging.warning("Couldn't get current app, reply was %s", lines[0][2:])
+            logging.warning("Couldn't get current app, reply was %s", lines[1])
             current_app = None
 
         # `running_apps` property
-        if not get_running_apps or len(lines) < 2:
+        if not get_running_apps or len(lines) < 3:
             return screen_on, awake, wake_lock_size, current_app, None
 
-        running_apps = [line.strip().rsplit(' ', 1)[-1] for line in lines[1:] if line.strip()]
+        running_apps = [line.strip().rsplit(' ', 1)[-1] for line in lines[2:] if line.strip()]
 
         return screen_on, awake, wake_lock_size, current_app, running_apps
 
