@@ -30,12 +30,15 @@ WINDOW_REGEX = re.compile(r"Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:
 
 # ADB shell commands for getting the `screen_on`, `awake`, `wake_lock`,
 # `audio_state`, `current_app`, and `running_apps` properties
-SCREEN_ON_CMD = r"dumpsys power | grep 'Display Power' | grep -q 'state=ON'"
-AWAKE_CMD = r"dumpsys power | grep mWakefulness | grep -q Awake"
-WAKE_LOCK_CMD = r"dumpsys power | grep Locks | grep -q 'size=0'"
-AUDIO_STATE_CMD = r"dumpsys audio | grep -q paused && echo -e '1\c' || (dumpsys audio | grep -q started && echo '2\c' || echo '0\c')"
+SCREEN_ON_CMD = "dumpsys power | grep 'Display Power' | grep -q 'state=ON'"
+AWAKE_CMD = "dumpsys power | grep mWakefulness | grep -q Awake"
+WAKE_LOCK_CMD = "dumpsys power | grep Locks | grep -q 'size=0'"
+WAKE_LOCK_SIZE_CMD = "dumpsys power | grep Locks | grep 'size='"
 CURRENT_APP_CMD = "dumpsys window windows | grep mCurrentFocus"
 RUNNING_APPS_CMD = "ps | grep u0_a"
+
+# echo '1' if the previous shell command was successful
+SUCCESS1 = r" && echo -e '1\c' "
 
 # echo '1' if the previous shell command was successful, echo '0' if it was not
 SUCCESS1_FAILURE0 = r" && echo -e '1\c' || echo -e '0\c' "
@@ -347,7 +350,7 @@ class FireTV:
         :return running_apps: the running apps
         """
         # The `screen_on`, `awake`, `wake_lock`, `audio_state`, and `current_app` properties.
-        screen_on, awake, wake_lock, audio_state, _current_app = self.get_properties()
+        screen_on, awake, wake_lock_size, _current_app, running_apps = self.get_properties(get_running_apps=get_running_apps, lazy=True)
 
         # Check if device is off.
         if not screen_on:
@@ -369,20 +372,16 @@ class FireTV:
                 current_app = None
 
             # Get the running apps.
-            if get_running_apps:
-                running_apps = self.running_apps
-            elif current_app:
+            if running_apps is None and current_app:
                 running_apps = [current_app]
-            else:
-                running_apps = None
 
             # Get the state.
             # TODO: determine the state differently based on the `current_app`.
             if current_app in [PACKAGE_LAUNCHER, PACKAGE_SETTINGS]:
                 state = STATE_STANDBY
 
-            # Check for a wake lock (device is playing).
-            elif wake_lock:
+            # Check if `wake_lock_size` is 1 (device is playing).
+            elif wake_lock_size == 1:
                 state = STATE_PLAYING
 
             # Otherwise, device is paused.
@@ -522,16 +521,12 @@ class FireTV:
         return self.adb_shell(WAKE_LOCK_CMD + SUCCESS1_FAILURE0) == '1'
 
     @property
-    def audio_state(self):
-        """Check if audio is playing, paused, or idle."""
-        output = self.adb_shell(AUDIO_STATE_CMD)
-        if output is None:
+    def wake_lock_size(self):
+        """Get the size of the current wake lock."""
+        output = self.adb_shell(WAKE_LOCK_SIZE_CMD)
+        if not output:
             return None
-        if output == '1':
-            return STATE_PAUSED
-        if output == '2':
-            return STATE_PLAYING
-        return STATE_IDLE
+        return int(output.strip().split("=")[1])
 
     @property
     def launcher(self):
@@ -543,41 +538,59 @@ class FireTV:
         """Check if the active application is the Amazon menu."""
         return self.current_app["package"] == PACKAGE_SETTINGS
 
-    def get_properties(self):
-        """Get the ``screen_on``, ``awake``, ``wake_lock``, ``audio_state``, and ``current_app`` properties."""
-        output = self.adb_shell(SCREEN_ON_CMD + SUCCESS1_FAILURE0 + " && " +
-                                AWAKE_CMD + SUCCESS1_FAILURE0 + " && " +
-                                WAKE_LOCK_CMD + SUCCESS1_FAILURE0 + " &&" +
-                                AUDIO_STATE_CMD + " &&" +
-                                CURRENT_APP_CMD)
+    def get_properties(self, get_running_apps=True, lazy=False):
+        """Get the ``screen_on``, ``awake``, ``wake_lock_size``, ``current_app``, and ``running_apps`` properties."""
+        if get_running_apps:
+            output = self.adb_shell(SCREEN_ON_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
+                                    AWAKE_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
+                                    WAKE_LOCK_SIZE_CMD + " &&" +
+                                    CURRENT_APP_CMD + " && " +
+                                    RUNNING_APPS_CMD)
+        else:
+            output = self.adb_shell(SCREEN_ON_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
+                                    AWAKE_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
+                                    WAKE_LOCK_SIZE_CMD + " &&" +
+                                    CURRENT_APP_CMD)
 
-        if not output:
+        # ADB command was unsuccessful
+        if output is None:
             return None, None, None, None, None
 
+        # `screen_on` property
+        if not output:
+            return False, False, -1, None, None
         screen_on = output[0] == '1'
+
+        # `awake` property
+        if len(output) < 2:
+            return screen_on, False, -1, None, None
         awake = output[1] == '1'
-        wake_lock = output[2] == '1'
 
-        if output[3] == '1':
-            audio_state = STATE_PAUSED
-        elif output[3] == '2':
-            audio_state = STATE_PLAYING
-        else:
-            audio_state = STATE_IDLE
+        lines = output.strip().splitlines()
 
-        if len(output) < 5:
-            return screen_on, awake, wake_lock, audio_state, None
+        # `wake_lock_size` property
+        if len(lines[0]) < 3:
+            return screen_on, awake, -1, None, None
+        wake_lock_size = int(lines[0].split("=")[1].strip())
 
-        current_focus = output[4:].replace("\r", "")
-        matches = WINDOW_REGEX.search(current_focus)
-
-        # case 1: current app was successfully found
+        # `current_app` property
+        matches = WINDOW_REGEX.search(lines[0])
         if matches:
+            # case 1: current app was successfully found
             (pkg, activity) = matches.group("package", "activity")
-            return screen_on, awake, wake_lock, audio_state, {"package": pkg, "activity": activity}
+            current_app = {"package": pkg, "activity": activity}
+        else:
+            # case 2: current app could not be found
+            logging.warning("Couldn't get current app, reply was %s", lines[0][2:])
+            current_app = None
 
-        # case 2: current app was not found
-        return screen_on, awake, wake_lock, audio_state, None
+        # `running_apps` property
+        if not get_running_apps or len(lines) < 2:
+            return screen_on, awake, wake_lock_size, current_app, None
+
+        running_apps = [line.strip().rsplit(' ', 1)[-1] for line in lines[1:] if line.strip()]
+
+        return screen_on, awake, wake_lock_size, current_app, running_apps
 
     # ======================================================================= #
     #                                                                         #
