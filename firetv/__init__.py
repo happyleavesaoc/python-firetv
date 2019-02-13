@@ -349,7 +349,7 @@ class FireTV:
         :return current_app: the current app
         :return running_apps: the running apps
         """
-        # The `screen_on`, `awake`, `wake_lock`, `audio_state`, and `current_app` properties.
+        # The `screen_on`, `awake`, `wake_lock_size`, `current_app`, and `running_apps` properties.
         screen_on, awake, wake_lock_size, _current_app, running_apps = self.get_properties(get_running_apps=get_running_apps, lazy=True)
 
         # Check if device is off.
@@ -526,7 +526,7 @@ class FireTV:
         output = self.adb_shell(WAKE_LOCK_SIZE_CMD)
         if not output:
             return None
-        return int(output.strip().split("=")[1])
+        return int(output.split("=")[1].strip())
 
     @property
     def launcher(self):
