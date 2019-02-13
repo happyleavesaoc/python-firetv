@@ -9,6 +9,8 @@ ADB Debugging must be enabled.
 import logging
 import re
 from socket import error as socket_error
+import sys
+import threading
 
 from adb import adb_commands
 from adb.sign_pythonrsa import PythonRSASigner
@@ -18,8 +20,28 @@ from adb_messenger.client import Client as AdbClient
 
 Signer = PythonRSASigner.FromRSAKeyPath
 
+if sys.version_info[0] > 2 and sys.version_info[1] > 1:
+    LOCK_KWARGS = {'timeout': 3}
+else:
+    LOCK_KWARGS = {}
+
 # Matches window windows output for app & activity name gathering
 WINDOW_REGEX = re.compile(r"Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:\/(?P<activity>.+?))?\}$", re.MULTILINE)
+
+# ADB shell commands for getting the `screen_on`, `awake`, `wake_lock`,
+# `wake_lock_size`, `current_app`, and `running_apps` properties
+SCREEN_ON_CMD = "dumpsys power | grep 'Display Power' | grep -q 'state=ON'"
+AWAKE_CMD = "dumpsys power | grep mWakefulness | grep -q Awake"
+WAKE_LOCK_CMD = "dumpsys power | grep Locks | grep -q 'size=0'"
+WAKE_LOCK_SIZE_CMD = "dumpsys power | grep Locks | grep 'size='"
+CURRENT_APP_CMD = "dumpsys window windows | grep mCurrentFocus"
+RUNNING_APPS_CMD = "ps | grep u0_a"
+
+# echo '1' if the previous shell command was successful
+SUCCESS1 = r" && echo -e '1\c' "
+
+# echo '1' if the previous shell command was successful, echo '0' if it was not
+SUCCESS1_FAILURE0 = r" && echo -e '1\c' || echo -e '0\c' "
 
 # ADB key event codes.
 HOME = 3
@@ -77,6 +99,18 @@ KEY_X = 52
 KEY_Y = 53
 KEY_Z = 54
 
+# Select key codes for use by a Home Assistant service.
+KEYS = {'POWER': POWER,
+        'SLEEP': SLEEP,
+        'HOME': HOME,
+        'ENTER': ENTER,
+        'BACK': BACK,
+        'MENU': MENU,
+        'UP': UP,
+        'DOWN': DOWN,
+        'LEFT': LEFT,
+        'RIGHT': RIGHT}
+
 # Fire TV states.
 STATE_ON = 'on'
 STATE_IDLE = 'idle'
@@ -111,6 +145,9 @@ class FireTV:
         # keep track of whether the ADB connection is intact
         self._available = False
 
+        # use a lock to make sure that ADB commands don't overlap
+        self._adb_lock = threading.Lock()
+
         # the attributes used for sending ADB commands; filled in in `self.connect()`
         self._adb = None  # python-adb
         self._adb_client = None  # pure-python-adb
@@ -119,12 +156,12 @@ class FireTV:
         # the methods used for sending ADB commands
         if not self.adb_server_ip:
             # python-adb
-            self._adb_shell = self._adb_shell_python_adb
-            self._adb_streaming_shell = self._adb_streaming_shell_python_adb
+            self.adb_shell = self._adb_shell_python_adb
+            self.adb_streaming_shell = self._adb_streaming_shell_python_adb
         else:
             # pure-python-adb
-            self._adb_shell = self._adb_shell_pure_python_adb
-            self._adb_streaming_shell = self._adb_streaming_shell_pure_python_adb
+            self.adb_shell = self._adb_shell_pure_python_adb
+            self.adb_streaming_shell = self._adb_streaming_shell_pure_python_adb
 
         # establish the ADB connection
         self.connect()
@@ -137,23 +174,43 @@ class FireTV:
     def _adb_shell_python_adb(self, cmd):
         if not self.available:
             return None
-        return self._adb.Shell(cmd)
+
+        if self._adb_lock.acquire(**LOCK_KWARGS):
+            try:
+                return self._adb.Shell(cmd)
+            finally:
+                self._adb_lock.release()
 
     def _adb_shell_pure_python_adb(self, cmd):
         if not self._available:
             return None
-        return self._adb_device.shell(cmd)
+
+        if self._adb_lock.acquire(**LOCK_KWARGS):
+            try:
+                return self._adb_device.shell(cmd)
+            finally:
+                self._adb_lock.release()
 
     def _adb_streaming_shell_python_adb(self, cmd):
         if not self.available:
             return []
-        return self._adb.StreamingShell(cmd)
+
+        if self._adb_lock.acquire(**LOCK_KWARGS):
+            try:
+                return self._adb.StreamingShell(cmd)
+            finally:
+                self._adb_lock.release()
 
     def _adb_streaming_shell_pure_python_adb(self, cmd):
         if not self._available:
             return None
+
         # this is not yet implemented
-        return []
+        if self._adb_lock.acquire(**LOCK_KWARGS):
+            try:
+                return []
+            finally:
+                self._adb_lock.release()
 
     def _dump(self, service, grep=None):
         """Perform a service dump.
@@ -163,8 +220,8 @@ class FireTV:
         :returns: Dump, optionally grepped.
         """
         if grep:
-            return self._adb_shell('dumpsys {0} | grep "{1}"'.format(service, grep))
-        return self._adb_shell('dumpsys {0}'.format(service))
+            return self.adb_shell('dumpsys {0} | grep "{1}"'.format(service, grep))
+        return self.adb_shell('dumpsys {0}'.format(service))
 
     def _dump_has(self, service, grep, search):
         """Check if a dump has particular content.
@@ -186,7 +243,7 @@ class FireTV:
 
         :param key: Key constant.
         """
-        self._adb_shell('input keyevent {0}'.format(key))
+        self.adb_shell('input keyevent {0}'.format(key))
 
     def _ps(self, search=''):
         """Perform a ps command with optional filtering.
@@ -197,7 +254,7 @@ class FireTV:
         if not self.available:
             return
         result = []
-        ps = self._adb_streaming_shell('ps')
+        ps = self.adb_streaming_shell('ps')
         try:
             for bad_line in ps:
                 # The splitting of the StreamingShell doesn't always work
@@ -218,7 +275,7 @@ class FireTV:
 
         # adb shell outputs in weird format, so we cut it into lines,
         # separate the retcode and return info to the user
-        res = self._adb_shell(cmd)
+        res = self.adb_shell(cmd)
         if res is None:
             return {}
 
@@ -236,43 +293,102 @@ class FireTV:
 
         :returns: True if successful, False otherwise
         """
-        if not self.adb_server_ip:
-            # python-adb
-            try:
-                if self.adbkey:
-                    signer = Signer(self.adbkey)
+        self._adb_lock.acquire(**LOCK_KWARGS)
+        try:
+            if not self.adb_server_ip:
+                # python-adb
+                try:
+                    if self.adbkey:
+                        signer = Signer(self.adbkey)
 
-                    # Connect to the device
-                    self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer], default_timeout_ms=9000)
-                else:
-                    self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, default_timeout_ms=9000)
+                        # Connect to the device
+                        self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, rsa_keys=[signer], default_timeout_ms=9000)
+                    else:
+                        self._adb = adb_commands.AdbCommands().ConnectDevice(serial=self.host, default_timeout_ms=9000)
 
-                # ADB connection successfully established
-                self._available = True
+                    # ADB connection successfully established
+                    self._available = True
 
-            except socket_error as serr:
-                self._adb = None
-                if self._available:
+                except socket_error as serr:
+                    self._adb = None
+                    if self._available:
+                        self._available = False
+                        if serr.strerror is None:
+                            serr.strerror = "Timed out trying to connect to ADB device."
+                        logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
+
+                finally:
+                    return self._available
+
+            else:
+                # pure-python-adb
+                try:
+                    self._adb_client = AdbClient(host=self.adb_server_ip, port=self.adb_server_port)
+                    self._adb_device = self._adb_client.device(self.host)
+                    self._available = bool(self._adb_device)
+
+                except:
                     self._available = False
-                    if serr.strerror is None:
-                        serr.strerror = "Timed out trying to connect to ADB device."
-                    logging.warning("Couldn't connect to host: %s, error: %s", self.host, serr.strerror)
 
-            finally:
-                return self._available
+                finally:
+                    return self._available
+
+        finally:
+            self._adb_lock.release()
+
+    # ======================================================================= #
+    #                                                                         #
+    #                          Home Assistant Update                          #
+    #                                                                         #
+    # ======================================================================= #
+    def update(self, get_running_apps=True):
+        """Get the state of the device, the current app, and the running apps.
+
+        :param get_running_apps: whether or not to get the ``running_apps`` property
+        :return state: the state of the device
+        :return current_app: the current app
+        :return running_apps: the running apps
+        """
+        # The `screen_on`, `awake`, `wake_lock_size`, `current_app`, and `running_apps` properties.
+        screen_on, awake, wake_lock_size, _current_app, running_apps = self.get_properties(get_running_apps=get_running_apps, lazy=True)
+
+        # Check if device is off.
+        if not screen_on:
+            state = STATE_OFF
+            current_app = None
+            running_apps = None
+
+        # Check if screen saver is on.
+        elif not awake:
+            state = STATE_IDLE
+            current_app = None
+            running_apps = None
 
         else:
-            # pure-python-adb
-            try:
-                self._adb_client = AdbClient(host=self.adb_server_ip, port=self.adb_server_port)
-                self._adb_device = self._adb_client.device(self.host)
-                self._available = bool(self._adb_device)
+            # Get the current app.
+            if isinstance(_current_app, dict) and 'package' in _current_app:
+                current_app = _current_app['package']
+            else:
+                current_app = None
 
-            except:
-                self._available = False
+            # Get the running apps.
+            if running_apps is None and current_app:
+                running_apps = [current_app]
 
-            finally:
-                return self._available
+            # Get the state.
+            # TODO: determine the state differently based on the `current_app`.
+            if current_app in [PACKAGE_LAUNCHER, PACKAGE_SETTINGS]:
+                state = STATE_STANDBY
+
+            # Check if `wake_lock_size` is 1 (device is playing).
+            elif wake_lock_size == 1:
+                state = STATE_PLAYING
+
+            # Otherwise, device is paused.
+            else:
+                state = STATE_PAUSED
+
+        return state, current_app, running_apps
 
     # ======================================================================= #
     #                                                                         #
@@ -364,13 +480,16 @@ class FireTV:
 
     @property
     def running_apps(self):
-        """Return an array of running user applications."""
-        return self._ps('u0_a')
+        """Return a list of running user applications."""
+        ps = self.adb_shell(RUNNING_APPS_CMD)
+        if ps:
+            return [line.strip().rsplit(' ', 1)[-1] for line in ps.splitlines() if line.strip()]
+        return []
 
     @property
     def current_app(self):
         """Return the current app."""
-        current_focus = self._dump("window windows", "mCurrentFocus")
+        current_focus = self.adb_shell(CURRENT_APP_CMD)
         if current_focus is None:
             return None
 
@@ -389,17 +508,25 @@ class FireTV:
     @property
     def screen_on(self):
         """Check if the screen is on."""
-        return self._dump_has('power', 'Display Power', 'state=ON')
+        return self.adb_shell(SCREEN_ON_CMD + SUCCESS1_FAILURE0) == '1'
 
     @property
     def awake(self):
         """Check if the device is awake (screensaver is not running)."""
-        return self._dump_has('power', 'mWakefulness', 'Awake')
+        return self.adb_shell(AWAKE_CMD + SUCCESS1_FAILURE0) == '1'
 
     @property
     def wake_lock(self):
         """Check for wake locks (device is playing)."""
-        return not self._dump_has('power', 'Locks', 'size=0')
+        return self.adb_shell(WAKE_LOCK_CMD + SUCCESS1_FAILURE0) == '1'
+
+    @property
+    def wake_lock_size(self):
+        """Get the size of the current wake lock."""
+        output = self.adb_shell(WAKE_LOCK_SIZE_CMD)
+        if not output:
+            return None
+        return int(output.split("=")[1].strip())
 
     @property
     def launcher(self):
@@ -411,6 +538,63 @@ class FireTV:
         """Check if the active application is the Amazon menu."""
         return self.current_app["package"] == PACKAGE_SETTINGS
 
+    def get_properties(self, get_running_apps=True, lazy=False):
+        """Get the ``screen_on``, ``awake``, ``wake_lock_size``, ``current_app``, and ``running_apps`` properties."""
+        if get_running_apps:
+            output = self.adb_shell(SCREEN_ON_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
+                                    AWAKE_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
+                                    WAKE_LOCK_SIZE_CMD + " &&" +
+                                    CURRENT_APP_CMD + " && " +
+                                    RUNNING_APPS_CMD)
+        else:
+            output = self.adb_shell(SCREEN_ON_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
+                                    AWAKE_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
+                                    WAKE_LOCK_SIZE_CMD + " &&" +
+                                    CURRENT_APP_CMD)
+
+        # ADB command was unsuccessful
+        if output is None:
+            return None, None, None, None, None
+
+        # `screen_on` property
+        if not output:
+            return False, False, -1, None, None
+        screen_on = output[0] == '1'
+
+        # `awake` property
+        if len(output) < 2:
+            return screen_on, False, -1, None, None
+        awake = output[1] == '1'
+
+        lines = output.strip().splitlines()
+
+        # `wake_lock_size` property
+        if len(lines[0]) < 3:
+            return screen_on, awake, -1, None, None
+        wake_lock_size = int(lines[0].split("=")[1].strip())
+
+        # `current_app` property
+        if len(lines) < 2:
+            return screen_on, awake, wake_lock_size, None, None
+
+        matches = WINDOW_REGEX.search(lines[1])
+        if matches:
+            # case 1: current app was successfully found
+            (pkg, activity) = matches.group("package", "activity")
+            current_app = {"package": pkg, "activity": activity}
+        else:
+            # case 2: current app could not be found
+            logging.warning("Couldn't get current app, reply was %s", lines[1])
+            current_app = None
+
+        # `running_apps` property
+        if not get_running_apps or len(lines) < 3:
+            return screen_on, awake, wake_lock_size, current_app, None
+
+        running_apps = [line.strip().rsplit(' ', 1)[-1] for line in lines[2:] if line.strip()]
+
+        return screen_on, awake, wake_lock_size, current_app, running_apps
+
     # ======================================================================= #
     #                                                                         #
     #                           turn on/off methods                           #
@@ -418,13 +602,11 @@ class FireTV:
     # ======================================================================= #
     def turn_on(self):
         """Send power action if device is off."""
-        if not self.screen_on:
-            self.power()
+        self.adb_shell(SCREEN_ON_CMD + " || (input keyevent {0} && input keyevent {1})".format(POWER, HOME))
 
     def turn_off(self):
         """Send power action if device is not off."""
-        if self.screen_on:
-            self.sleep()
+        self.adb_shell(SCREEN_ON_CMD + " && input keyevent {0}".format(SLEEP))
 
     # ======================================================================= #
     #                                                                         #
