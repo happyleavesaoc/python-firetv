@@ -29,7 +29,7 @@ else:
 WINDOW_REGEX = re.compile(r"Window\{(?P<id>.+?) (?P<user>.+) (?P<package>.+?)(?:\/(?P<activity>.+?))?\}$", re.MULTILINE)
 
 # ADB shell commands for getting the `screen_on`, `awake`, `wake_lock`,
-# `audio_state`, `current_app`, and `running_apps` properties
+# `wake_lock_size`, `current_app`, and `running_apps` properties
 SCREEN_ON_CMD = "dumpsys power | grep 'Display Power' | grep -q 'state=ON'"
 AWAKE_CMD = "dumpsys power | grep mWakefulness | grep -q Awake"
 WAKE_LOCK_CMD = "dumpsys power | grep Locks | grep -q 'size=0'"
