@@ -394,7 +394,18 @@ class FireTV:
                 if wake_lock_size == 5:
                     state = STATE_PLAYING
                 else:
+                    # wake_lock_size == 2
                     state = STATE_PAUSED
+
+            # Netflix
+            elif current_app == NETFLIX:
+                if wake_lock_size == 4:
+                    state = STATE_PLAYING
+                elif wake_lock_size == 2:
+                    state = STATE_PAUSED
+                else:
+                    # wake_lock_size == 3
+                    state = STATE_STANDBY
 
             # Check if `wake_lock_size` is 1 (device is playing).
             elif wake_lock_size == 1:
