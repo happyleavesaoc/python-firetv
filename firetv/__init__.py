@@ -593,7 +593,6 @@ class FireTV:
             current_app = {"package": pkg, "activity": activity}
         else:
             # case 2: current app could not be found
-            logging.warning("Couldn't get current app, reply was %s", lines[1])
             current_app = None
 
         # `running_apps` property
