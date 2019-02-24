@@ -409,8 +409,8 @@ class FireTV:
         return self._send_intent(app, INTENT_LAUNCH)
 
     def stop_app(self, app):
-        """Stop an app (really, it just returns to the home screen)."""
-        return self._send_intent(PACKAGE_LAUNCHER, INTENT_HOME)
+        """Stop an app."""
+        return self.adb_shell("am force-stop {0}".format(app))
 
     # ======================================================================= #
     #                                                                         #
