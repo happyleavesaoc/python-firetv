@@ -45,6 +45,7 @@ SUCCESS1_FAILURE0 = r" && echo -e '1\c' || echo -e '0\c' "
 
 # ADB key event codes.
 HOME = 3
+CENTER = 23
 VOLUME_UP = 24
 VOLUME_DOWN = 25
 POWER = 26
@@ -103,7 +104,7 @@ KEY_Z = 54
 KEYS = {'POWER': POWER,
         'SLEEP': SLEEP,
         'HOME': HOME,
-        'ENTER': ENTER,
+        'CENTER': CENTER,
         'BACK': BACK,
         'MENU': MENU,
         'UP': UP,
