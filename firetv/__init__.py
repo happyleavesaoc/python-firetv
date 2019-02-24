@@ -45,6 +45,7 @@ SUCCESS1_FAILURE0 = r" && echo -e '1\c' || echo -e '0\c' "
 
 # ADB key event codes.
 HOME = 3
+CENTER = 23
 VOLUME_UP = 24
 VOLUME_DOWN = 25
 POWER = 26
@@ -103,13 +104,21 @@ KEY_Z = 54
 KEYS = {'POWER': POWER,
         'SLEEP': SLEEP,
         'HOME': HOME,
-        'ENTER': ENTER,
+        'CENTER': CENTER,
         'BACK': BACK,
         'MENU': MENU,
         'UP': UP,
         'DOWN': DOWN,
         'LEFT': LEFT,
         'RIGHT': RIGHT}
+
+# Apps.
+AMAZON_VIDEO = 'com.amazon.avod'
+KODI = 'org.xbmc.kodi'
+NETFLIX = 'com.netflix.ninja'
+APPS = {AMAZON_VIDEO: 'Amazon Video',
+        KODI: 'Kodi',
+        NETFLIX: 'Netflix'}
 
 # Fire TV states.
 STATE_ON = 'on'
@@ -408,8 +417,8 @@ class FireTV:
         return self._send_intent(app, INTENT_LAUNCH)
 
     def stop_app(self, app):
-        """Stop an app (really, it just returns to the home screen)."""
-        return self._send_intent(PACKAGE_LAUNCHER, INTENT_HOME)
+        """Stop an app."""
+        return self.adb_shell("am force-stop {0}".format(app))
 
     # ======================================================================= #
     #                                                                         #
@@ -584,7 +593,6 @@ class FireTV:
             current_app = {"package": pkg, "activity": activity}
         else:
             # case 2: current app could not be found
-            logging.warning("Couldn't get current app, reply was %s", lines[1])
             current_app = None
 
         # `running_apps` property
