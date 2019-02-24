@@ -112,6 +112,14 @@ KEYS = {'POWER': POWER,
         'LEFT': LEFT,
         'RIGHT': RIGHT}
 
+# Apps.
+AMAZON_VIDEO = 'com.amazon.avod'
+KODI = 'org.xbmc.kodi'
+NETFLIX = 'com.netflix.ninja'
+APPS = {AMAZON_VIDEO: 'Amazon Video',
+        KODI: 'Kodi',
+        NETFLIX: 'Netflix'}
+
 # Fire TV states.
 STATE_ON = 'on'
 STATE_IDLE = 'idle'
