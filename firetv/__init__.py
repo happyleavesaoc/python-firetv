@@ -389,6 +389,21 @@ class FireTV:
             if current_app in [PACKAGE_LAUNCHER, PACKAGE_SETTINGS]:
                 state = STATE_STANDBY
 
+            # Amazon Video
+            elif current_app == AMAZON_VIDEO:
+                if wake_lock_size == 5:
+                    state = STATE_PLAYING
+                else:
+                    # wake_lock_size == 2
+                    state = STATE_PAUSED
+
+            # Netflix
+            elif current_app == NETFLIX:
+                if wake_lock_size > 3:
+                    state = STATE_PLAYING
+                else:
+                    state = STATE_PAUSED
+
             # Check if `wake_lock_size` is 1 (device is playing).
             elif wake_lock_size == 1:
                 state = STATE_PLAYING
