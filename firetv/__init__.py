@@ -571,13 +571,13 @@ class FireTV:
         if get_running_apps:
             output = self.adb_shell(SCREEN_ON_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
                                     AWAKE_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
-                                    WAKE_LOCK_SIZE_CMD + " &&" +
+                                    WAKE_LOCK_SIZE_CMD + " && " +
                                     CURRENT_APP_CMD + " && " +
                                     RUNNING_APPS_CMD)
         else:
             output = self.adb_shell(SCREEN_ON_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
                                     AWAKE_CMD + (SUCCESS1 if lazy else SUCCESS1_FAILURE0) + " && " +
-                                    WAKE_LOCK_SIZE_CMD + " &&" +
+                                    WAKE_LOCK_SIZE_CMD + " && " +
                                     CURRENT_APP_CMD)
 
         # ADB command was unsuccessful
