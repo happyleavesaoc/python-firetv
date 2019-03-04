@@ -38,10 +38,10 @@ CURRENT_APP_CMD = "dumpsys window windows | grep mCurrentFocus"
 RUNNING_APPS_CMD = "ps | grep u0_a"
 
 # echo '1' if the previous shell command was successful
-SUCCESS1 = r" && echo -e '1\c' "
+SUCCESS1 = r" && echo -e '1\c'"
 
 # echo '1' if the previous shell command was successful, echo '0' if it was not
-SUCCESS1_FAILURE0 = r" && echo -e '1\c' || echo -e '0\c' "
+SUCCESS1_FAILURE0 = r" && echo -e '1\c' || echo -e '0\c'"
 
 # ADB key event codes.
 HOME = 3
