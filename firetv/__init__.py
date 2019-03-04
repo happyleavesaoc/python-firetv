@@ -112,14 +112,6 @@ KEYS = {'POWER': POWER,
         'LEFT': LEFT,
         'RIGHT': RIGHT}
 
-# Apps.
-AMAZON_VIDEO = 'com.amazon.avod'
-KODI = 'org.xbmc.kodi'
-NETFLIX = 'com.netflix.ninja'
-APPS = {AMAZON_VIDEO: 'Amazon Video',
-        KODI: 'Kodi',
-        NETFLIX: 'Netflix'}
-
 # Fire TV states.
 STATE_ON = 'on'
 STATE_IDLE = 'idle'
@@ -129,8 +121,18 @@ STATE_PAUSED = 'paused'
 STATE_STANDBY = 'standby'
 STATE_UNKNOWN = 'unknown'
 
+# Apps.
 PACKAGE_LAUNCHER = "com.amazon.tv.launcher"
 PACKAGE_SETTINGS = "com.amazon.tv.settings"
+
+AMAZON_VIDEO = 'com.amazon.avod'
+KODI = 'org.xbmc.kodi'
+NETFLIX = 'com.netflix.ninja'
+APPS = {AMAZON_VIDEO: 'Amazon Video',
+        KODI: 'Kodi',
+        NETFLIX: 'Netflix'}
+
+# Intents.
 INTENT_LAUNCH = "android.intent.category.LAUNCHER"
 INTENT_HOME = "android.intent.category.HOME"
 
