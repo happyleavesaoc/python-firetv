@@ -12,10 +12,22 @@ from socket import error as socket_error
 import sys
 import threading
 
-from adb import adb_commands
-from adb.sign_pythonrsa import PythonRSASigner
-from adb.adb_protocol import InvalidChecksumError
-from adb_messenger.client import Client as AdbClient
+# Install adb shell if we can, then try the others
+USE_ADB_SHELL = False
+try:
+    from adb_shell.adb_device import AdbDevice
+    from adb_shell.auth.sign_pythonrsa import PythonRSASigner
+    from adb_shell.exceptions import InvalidChecksumError
+    USE_ADB_SHELL = True
+except:
+    pass
+
+
+if not USE_ADB_SHELL:
+    from adb import adb_commands
+    from adb.sign_pythonrsa import PythonRSASigner
+    from adb.adb_protocol import InvalidChecksumError
+    from adb_messenger.client import Client as AdbClient
 
 
 Signer = PythonRSASigner.FromRSAKeyPath
@@ -162,10 +174,14 @@ class FireTV:
         # the attributes used for sending ADB commands; filled in in `self.connect()`
         self._adb = None  # python-adb
         self._adb_client = None  # pure-python-adb
-        self._adb_device = None  # pure-python-adb
+        self._adb_device = None  # pure-python-adb && adb_shell
 
         # the methods used for sending ADB commands
-        if not self.adb_server_ip:
+        if USE_ADB_SHELL:
+            # adb_shell
+            self.adb_shell = self._adb_shell_adb_shell
+            self.adb_streaming_shell = self._adb_shell_adb_shell
+        elif not self.adb_server_ip:
             # python-adb
             self.adb_shell = self._adb_shell_python_adb
             self.adb_streaming_shell = self._adb_streaming_shell_python_adb
@@ -182,6 +198,16 @@ class FireTV:
     #                               ADB methods                               #
     #                                                                         #
     # ======================================================================= #
+    def _adb_shell_adb_shell(self, cmd):
+        if not self.available:
+            return None
+
+        if self._adb_lock.acquire(**LOCK_KWARGS):
+            try:
+                return self._adb_device.shell(cmd)
+            finally:
+                self._adb_lock.release()
+
     def _adb_shell_python_adb(self, cmd):
         if not self.available:
             return None
@@ -195,6 +221,16 @@ class FireTV:
     def _adb_shell_pure_python_adb(self, cmd):
         if not self._available:
             return None
+
+        if self._adb_lock.acquire(**LOCK_KWARGS):
+            try:
+                return self._adb_device.shell(cmd)
+            finally:
+                self._adb_lock.release()
+
+    def _adb_streaming_shell_adb_shell(self, cmd):
+        if not self.available:
+            return []
 
         if self._adb_lock.acquire(**LOCK_KWARGS):
             try:
@@ -305,8 +341,24 @@ class FireTV:
         :returns: True if successful, False otherwise
         """
         self._adb_lock.acquire(**LOCK_KWARGS)
+        signer = None
+        if self.adbkey:
+            signer = Signer(self.adbkey)
         try:
-            if not self.adb_server_ip:
+            if USE_ADB_SHELL:
+                # adb_shell
+                self._adb_device = AdbDevice(serial=self.host)
+
+                # Connect to the device
+                connected = False
+                if signer:
+                    connected = self._adb_device.connect(rsa_keys=[signer])
+                else:
+                    connected = self._adb_device.connect()
+
+                self._available = connected
+
+            elif not self.adb_server_ip:
                 # python-adb
                 try:
                     if self.adbkey:
@@ -471,6 +523,14 @@ class FireTV:
     @property
     def available(self):
         """Check whether the ADB connection is intact."""
+
+        if USE_ADB_SHELL:
+            # adb_shell
+            if not self._adb_device:
+                return False
+
+            return self._adb_device.available
+
         if not self.adb_server_ip:
             # python-adb
             return bool(self._adb)
