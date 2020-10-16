@@ -15,9 +15,10 @@ import threading
 # Install adb shell if we can, then try the others
 USE_ADB_SHELL = False
 try:
-    from adb_shell.adb_device import AdbDevice
+    from adb_shell.adb_device import AdbDevice, AdbDeviceTcp
     from adb_shell.auth.sign_pythonrsa import PythonRSASigner
     from adb_shell.exceptions import InvalidChecksumError
+
     USE_ADB_SHELL = True
 except:
     pass
@@ -347,19 +348,25 @@ class FireTV:
         try:
             if USE_ADB_SHELL:
                 # adb_shell
-                self._adb_device = AdbDevice(serial=self.host)
+                host, _, port = self.host.partition(':')
+                self._adb_device = AdbDeviceTcp(host=host, port=port)
 
                 # Connect to the device
                 connected = False
-                if signer:
-                    connected = self._adb_device.connect(rsa_keys=[signer])
-                else:
-                    connected = self._adb_device.connect()
+                from adb_shell.exceptions import DeviceAuthError
+                try:
+                    if signer:
+                        connected = self._adb_device.connect(rsa_keys=[signer])
+                    else:
+                        connected = self._adb_device.connect()
+                except DeviceAuthError as err:
+                    print("DeviceAuthError:", err)
 
                 self._available = connected
 
             elif not self.adb_server_ip:
                 # python-adb
+                from adb.usb_exceptions import DeviceAuthError
                 try:
                     if self.adbkey:
                         signer = Signer(self.adbkey)
@@ -381,6 +388,9 @@ class FireTV:
                     # ADB connection attempt failed
                     self._adb = None
                     self._available = False
+
+                except DeviceAuthError as err:
+                    print("DeviceAuthError:", err)
 
                 finally:
                     return self._available
