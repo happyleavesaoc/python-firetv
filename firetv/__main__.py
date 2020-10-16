@@ -19,7 +19,10 @@ Find device IP:
 """
 
 import argparse
+import os
 import re
+from os.path import expanduser
+
 import yaml
 import logging
 from flask import Flask, jsonify, request, abort
@@ -258,8 +261,15 @@ def main():
     if args.config:
         _add_devices_from_config(args)
 
-    if args.default and not add('default', args.default):
+    home = expanduser("~")
+    adb_key = os.path.join(home, ".android", "adbkey")
+
+    if not os.path.exists(adb_key):
+        adb_key = ''
+
+    if args.default and not add('default', args.default, adbkey=adb_key):
         exit('invalid hostname')
+
     app.run(host='0.0.0.0', port=args.port)
 
 
